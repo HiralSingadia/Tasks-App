@@ -11,7 +11,8 @@ import type { Task } from '@/types/task';
 
 type TasksContextValue = {
   activeTasks: Task[];
-  addTask: (title: string) => void;
+  addTask: (title: string, places?: string[], options?: { append?: boolean }) => void;
+  editTask: (taskId: string, title: string) => void;
   tasks: Task[];
   toggleTask: (taskId: string) => void;
 };
@@ -101,25 +102,26 @@ export function TasksProvider({ children }: PropsWithChildren) {
     });
   }, [hasLoadedStoredTasks, tasks]);
 
-  const addTask = (title: string) => {
+  const addTask = (title: string, forcedPlaces?: string[], options?: { append?: boolean }) => {
     const trimmedTitle = title.trim();
 
     if (!trimmedTitle) {
       return;
     }
 
-    const places = matchPlaces(trimmedTitle);
+    const places = forcedPlaces?.length ? forcedPlaces : matchPlaces(trimmedTitle);
 
-    setTasks((currentTasks) => [
-      {
+    const newTask = {
         id: Date.now().toString(),
         title: trimmedTitle,
         place: getPlaceLabel(places),
         places,
         completed: false,
-      },
-      ...currentTasks,
-    ]);
+      };
+
+    setTasks((currentTasks) =>
+      options?.append ? [...currentTasks, newTask] : [newTask, ...currentTasks]
+    );
   };
 
   const toggleTask = (taskId: string) => {
@@ -130,8 +132,20 @@ export function TasksProvider({ children }: PropsWithChildren) {
     );
   };
 
+  const editTask = (taskId: string, title: string) => {
+    const trimmedTitle = title.trim();
+
+    if (!trimmedTitle) {
+      return;
+    }
+
+    setTasks((currentTasks) =>
+      currentTasks.map((task) => (task.id === taskId ? { ...task, title: trimmedTitle } : task))
+    );
+  };
+
   return (
-    <TasksContext.Provider value={{ activeTasks, addTask, tasks, toggleTask }}>
+    <TasksContext.Provider value={{ activeTasks, addTask, editTask, tasks, toggleTask }}>
       {children}
     </TasksContext.Provider>
   );

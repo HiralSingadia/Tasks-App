@@ -11,12 +11,15 @@ import { useTasks } from '@/hooks/use-tasks';
 
 export default function HomeScreen() {
   const [taskTitle, setTaskTitle] = useState('');
-  const { activeTasks, addTask, tasks, toggleTask } = useTasks();
+  const { activeTasks, addTask, editTask, tasks, toggleTask } = useTasks();
   const { loadNearbyStores } = useNearbyStores();
 
   const handleAddTask = () => {
     addTask(taskTitle);
     setTaskTitle('');
+  };
+  const handleAddTaskToCategory = (title: string, place: string) => {
+    addTask(title, [place], { append: true });
   };
   const openNearbyStores = () => {
     router.push('/nearby');
@@ -38,6 +41,8 @@ export default function HomeScreen() {
 
         <TaskList
           tasks={tasks}
+          onAddTaskToCategory={handleAddTaskToCategory}
+          onEditTask={editTask}
           onExploreNearby={openNearbyStores}
           onToggleTask={toggleTask}
           remainingTaskCount={activeTasks.length}

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet } from 'react-native';
+import { Pressable, StyleSheet, TextInput } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -21,6 +21,8 @@ const getCategoryTitle = (place: string) => (place === 'Grocery store' ? 'Grocer
 type TaskListProps = {
   remainingTaskCount: number;
   tasks: Task[];
+  onAddTaskToCategory: (title: string, place: string) => void;
+  onEditTask: (taskId: string, title: string) => void;
   onExploreNearby: () => void;
   onToggleTask: (taskId: string) => void;
 };
@@ -28,10 +30,16 @@ type TaskListProps = {
 export function TaskList({
   remainingTaskCount,
   tasks,
+  onAddTaskToCategory,
+  onEditTask,
   onExploreNearby,
   onToggleTask,
 }: TaskListProps) {
   const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
+  const [categoryDrafts, setCategoryDrafts] = useState<Record<string, string>>({});
+  const [addingCategory, setAddingCategory] = useState<string | null>(null);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [taskDrafts, setTaskDrafts] = useState<Record<string, string>>({});
   const categoryGroups = tasks.reduce<Record<string, Task[]>>((groups, task) => {
     const places = task.places ?? [task.place];
 
@@ -65,55 +73,184 @@ export function TaskList({
   const renderCategoryTile = ([place, placeTasks]: [string, Task[]]) => {
     const activeCount = getActiveTaskCount(placeTasks);
     const isCollapsed = collapsedCategories[place] ?? false;
+    const isAdding = addingCategory === place;
     const categoryTitle = getCategoryTitle(place);
+    const categoryDraft = categoryDrafts[place] ?? '';
+    const startEditingTask = (task: Task) => {
+      setEditingTaskId(task.id);
+      setTaskDrafts((currentDrafts) => ({ ...currentDrafts, [task.id]: task.title }));
+    };
+    const saveTaskEdit = (task: Task) => {
+      const taskDraft = taskDrafts[task.id] ?? task.title;
+      const trimmedDraft = taskDraft.trim();
+
+      if (!trimmedDraft) {
+        setTaskDrafts((currentDrafts) => ({ ...currentDrafts, [task.id]: task.title }));
+        setEditingTaskId(null);
+        return;
+      }
+
+      onEditTask(task.id, trimmedDraft);
+      setTaskDrafts((currentDrafts) => ({ ...currentDrafts, [task.id]: trimmedDraft }));
+      setEditingTaskId(null);
+    };
+    const addCategoryTask = () => {
+      const trimmedDraft = categoryDraft.trim();
+
+      if (!trimmedDraft) {
+        return;
+      }
+
+      onAddTaskToCategory(trimmedDraft, place);
+      setCategoryDrafts((currentDrafts) => ({ ...currentDrafts, [place]: '' }));
+      setAddingCategory(null);
+    };
 
     return (
       <ThemedView key={place} style={styles.categoryTile}>
-        <Pressable
-          accessibilityLabel={`${categoryTitle}, ${activeCount} ${
-            activeCount === 1 ? 'task' : 'tasks'
-          }`}
-          accessibilityHint={isCollapsed ? 'Shows tasks in this category' : 'Hides tasks in this category'}
-          accessibilityRole="button"
-          accessibilityState={{ expanded: !isCollapsed }}
-          onPress={() =>
-            setCollapsedCategories((currentCategories) => ({
-              ...currentCategories,
-              [place]: !isCollapsed,
-            }))
-          }
-          style={({ pressed }) => [styles.categoryHeader, pressed && styles.categoryHeaderPressed]}>
-          <IconSymbol
-            name={isCollapsed ? 'chevron.right' : 'chevron.down'}
-            size={18}
-            color="#60706A"
-            style={styles.collapseIcon}
-          />
-          <ThemedView style={styles.categorySymbolBadge}>
-            <IconSymbol name={getCategorySymbol(place)} size={23} color="#2F6B4F" />
-          </ThemedView>
-          <ThemedText numberOfLines={1} style={styles.categoryTitle}>
-            {categoryTitle}
-          </ThemedText>
-          <ThemedText style={styles.categoryCount}>{activeCount}</ThemedText>
-        </Pressable>
+        <ThemedView style={styles.categoryHeader}>
+          <Pressable
+            accessibilityLabel={`${categoryTitle}, ${activeCount} ${
+              activeCount === 1 ? 'task' : 'tasks'
+            }`}
+            accessibilityHint={isCollapsed ? 'Shows tasks in this category' : 'Hides tasks in this category'}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: !isCollapsed }}
+            onPress={() =>
+              setCollapsedCategories((currentCategories) => ({
+                ...currentCategories,
+                [place]: !isCollapsed,
+              }))
+            }
+            style={({ pressed }) => [
+              styles.categoryToggle,
+              pressed && styles.categoryHeaderPressed,
+            ]}>
+            <IconSymbol
+              name={isCollapsed ? 'chevron.right' : 'chevron.down'}
+              size={18}
+              color="#60706A"
+              style={styles.collapseIcon}
+            />
+            <ThemedView style={styles.categorySymbolBadge}>
+              <IconSymbol name={getCategorySymbol(place)} size={23} color="#2F6B4F" />
+            </ThemedView>
+            <ThemedText numberOfLines={1} style={styles.categoryTitle}>
+              {categoryTitle}
+            </ThemedText>
+            <ThemedText style={styles.categoryCount}>{activeCount}</ThemedText>
+          </Pressable>
+          <Pressable
+            accessibilityLabel={`Add item to ${categoryTitle}`}
+            accessibilityRole="button"
+            onPress={() => {
+              setCollapsedCategories((currentCategories) => ({
+                ...currentCategories,
+                [place]: false,
+              }));
+              setAddingCategory((currentCategory) => (currentCategory === place ? null : place));
+            }}
+            style={({ pressed }) => [styles.headerAddButton, pressed && styles.headerAddPressed]}>
+            <IconSymbol name="plus" size={18} color="#2F6B4F" />
+          </Pressable>
+        </ThemedView>
 
         {!isCollapsed
-          ? placeTasks.map((task) => (
-              <Pressable
-                key={`${place}-${task.id}`}
-                style={[styles.taskItem, task.completed && styles.completedItem]}
-                onPress={() => onToggleTask(task.id)}>
-                <ThemedView style={[styles.taskBullet, task.completed && styles.completedBullet]}>
-                  {task.completed ? <ThemedText style={styles.checkmark}>✓</ThemedText> : null}
-                </ThemedView>
-                <ThemedText
-                  numberOfLines={2}
-                  style={[styles.taskTitle, task.completed && styles.completedText]}>
-                  {task.title}
-                </ThemedText>
-              </Pressable>
-            ))
+          ? (
+              <>
+                {placeTasks.map((task) => (
+                  editingTaskId === task.id ? (
+                    <ThemedView key={`${place}-${task.id}`} style={styles.taskEditRow}>
+                      <TextInput
+                        accessibilityLabel={`Edit ${task.title}`}
+                      autoFocus
+                      multiline
+                      value={taskDrafts[task.id] ?? task.title}
+                      onChangeText={(value) =>
+                        setTaskDrafts((currentDrafts) => ({
+                            ...currentDrafts,
+                            [task.id]: value,
+                          }))
+                        }
+                        returnKeyType="default"
+                        style={styles.taskEditInput}
+                      />
+                      <Pressable
+                        accessibilityLabel={`Save ${task.title}`}
+                        accessibilityRole="button"
+                        onPress={() => saveTaskEdit(task)}
+                        style={({ pressed }) => [
+                          styles.taskIconButton,
+                          styles.taskSaveButton,
+                          pressed && styles.taskIconButtonPressed,
+                        ]}>
+                        <IconSymbol name="checkmark" size={18} color="#FFFFFF" />
+                      </Pressable>
+                    </ThemedView>
+                  ) : (
+                    <ThemedView
+                      key={`${place}-${task.id}`}
+                      style={[styles.taskItem, task.completed && styles.completedItem]}>
+                      <Pressable
+                        accessibilityLabel={`${task.completed ? 'Mark incomplete' : 'Mark complete'} ${
+                          task.title
+                        }`}
+                        accessibilityRole="button"
+                        onPress={() => onToggleTask(task.id)}
+                        style={styles.taskBulletButton}>
+                        <ThemedView
+                          style={[styles.taskBullet, task.completed && styles.completedBullet]}>
+                          {task.completed ? <ThemedText style={styles.checkmark}>✓</ThemedText> : null}
+                        </ThemedView>
+                      </Pressable>
+                      <Pressable
+                        accessibilityLabel={`Edit ${task.title}`}
+                        accessibilityRole="button"
+                        onPress={() => startEditingTask(task)}
+                        style={({ pressed }) => [
+                          styles.taskTitleButton,
+                          pressed && styles.taskTitleButtonPressed,
+                        ]}>
+                        <ThemedText style={[styles.taskTitle, task.completed && styles.completedText]}>
+                          {task.title}
+                        </ThemedText>
+                      </Pressable>
+                    </ThemedView>
+                  )
+                ))}
+
+                {isAdding ? (
+                  <ThemedView style={styles.categoryAddRow}>
+                    <TextInput
+                      accessibilityLabel={`Add item to ${categoryTitle}`}
+                      autoFocus
+                      value={categoryDraft}
+                      onChangeText={(value) =>
+                        setCategoryDrafts((currentDrafts) => ({
+                          ...currentDrafts,
+                          [place]: value,
+                        }))
+                      }
+                      onSubmitEditing={addCategoryTask}
+                      placeholder={`Add to ${categoryTitle}`}
+                      placeholderTextColor="#7A838F"
+                      returnKeyType="done"
+                      style={styles.categoryAddInput}
+                    />
+                    <Pressable
+                      accessibilityLabel={`Save item to ${categoryTitle}`}
+                      accessibilityRole="button"
+                      onPress={addCategoryTask}
+                      style={({ pressed }) => [
+                        styles.categoryAddButton,
+                        pressed && styles.categoryAddButtonPressed,
+                      ]}>
+                      <IconSymbol name="plus" size={20} color="#FFFFFF" />
+                    </Pressable>
+                  </ThemedView>
+                ) : null}
+              </>
+            )
           : null}
       </ThemedView>
     );
@@ -203,6 +340,12 @@ const styles = StyleSheet.create({
     gap: 10,
     justifyContent: 'space-between',
   },
+  categoryToggle: {
+    alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+    gap: 10,
+  },
   categoryHeaderPressed: {
     opacity: 0.72,
   },
@@ -228,23 +371,88 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '900',
   },
+  headerAddButton: {
+    alignItems: 'center',
+    backgroundColor: '#E7F1E7',
+    borderColor: '#CFE0CF',
+    borderRadius: 12,
+    borderWidth: 1,
+    height: 34,
+    justifyContent: 'center',
+    width: 34,
+  },
+  headerAddPressed: {
+    opacity: 0.72,
+  },
   taskItem: {
     alignItems: 'flex-start',
-    backgroundColor: '#F7F9F4',
-    borderRadius: 10,
+    backgroundColor: 'transparent',
     flexDirection: 'row',
-    gap: 7,
-    paddingHorizontal: 8,
+    gap: 10,
+    paddingHorizontal: 2,
     paddingVertical: 7,
+  },
+  taskBulletButton: {
+    alignItems: 'center',
+    height: 40,
+    justifyContent: 'flex-start',
+    paddingTop: 5,
+    width: 38,
+  },
+  taskTitleButton: {
+    flex: 1,
+    alignItems: 'flex-start',
+    minHeight: 40,
+    justifyContent: 'flex-start',
+    paddingTop: 3,
+  },
+  taskTitleButtonPressed: {
+    opacity: 0.72,
+  },
+  taskIconButton: {
+    alignItems: 'center',
+    borderRadius: 8,
+    height: 30,
+    justifyContent: 'center',
+    width: 30,
+  },
+  taskIconButtonPressed: {
+    opacity: 0.72,
+  },
+  taskEditRow: {
+    alignItems: 'flex-start',
+    backgroundColor: '#F7F9F4',
+    borderColor: '#DCE4DB',
+    borderRadius: 10,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 8,
+    paddingLeft: 10,
+    paddingRight: 6,
+    paddingVertical: 5,
+  },
+  taskEditInput: {
+    color: '#17231C',
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '700',
+    lineHeight: 21,
+    minHeight: 58,
+    paddingVertical: 6,
+    textAlignVertical: 'top',
+  },
+  taskSaveButton: {
+    backgroundColor: '#2F6B4F',
+    marginTop: 4,
   },
   completedItem: {
     opacity: 0.55,
   },
   taskBullet: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    borderWidth: 1.5,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1.8,
     borderColor: '#2F6B4F',
     alignItems: 'center',
     justifyContent: 'center',
@@ -255,16 +463,46 @@ const styles = StyleSheet.create({
   },
   checkmark: {
     color: '#FFFFFF',
-    fontSize: 11,
+    fontSize: 14,
     fontWeight: '800',
-    lineHeight: 14,
+    lineHeight: 18,
   },
   taskTitle: {
     color: '#17231C',
     flex: 1,
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '700',
-    lineHeight: 18,
+    lineHeight: 21,
+  },
+  categoryAddRow: {
+    alignItems: 'center',
+    backgroundColor: '#F7F9F4',
+    borderColor: '#E3E8DE',
+    borderRadius: 10,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 8,
+    paddingLeft: 10,
+    paddingRight: 6,
+    paddingVertical: 5,
+  },
+  categoryAddInput: {
+    color: '#17231C',
+    flex: 1,
+    fontSize: 14,
+    minHeight: 36,
+    paddingVertical: 0,
+  },
+  categoryAddButton: {
+    alignItems: 'center',
+    backgroundColor: '#2F6B4F',
+    borderRadius: 9,
+    height: 34,
+    justifyContent: 'center',
+    width: 38,
+  },
+  categoryAddButtonPressed: {
+    opacity: 0.72,
   },
   completedText: {
     textDecorationLine: 'line-through',

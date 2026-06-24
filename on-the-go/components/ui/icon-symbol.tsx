@@ -20,6 +20,8 @@ const MAPPING = {
   'chevron.left.forwardslash.chevron.right': 'code',
   'chevron.right': 'chevron-right',
   'chevron.down': 'keyboard-arrow-down',
+  checkmark: 'check',
+  plus: 'add',
   'cart.fill': 'shopping-cart',
   'cross.case.fill': 'local-pharmacy',
   'shippingbox.fill': 'local-shipping',
