@@ -17,13 +17,51 @@ const CATEGORY_SYMBOLS: Record<string, IconSymbolName> = {
 
 const getCategorySymbol = (place: string) => CATEGORY_SYMBOLS[place] ?? 'mappin.circle.fill';
 const getCategoryTitle = (place: string) => (place === 'Grocery store' ? 'Groceries' : place);
+const CATEGORY_ACCENTS = {
+  'Cafe or convenience store': {
+    border: '#F4D7A4',
+    soft: '#FFF4DD',
+    strong: '#A35D00',
+  },
+  'Gas station': {
+    border: '#BFD7FF',
+    soft: '#EAF2FF',
+    strong: '#2765B5',
+  },
+  'Grocery store': {
+    border: '#BFE5C8',
+    soft: '#EAF8ED',
+    strong: '#2F7D4F',
+  },
+  'Pet store': {
+    border: '#E7C8F4',
+    soft: '#F8ECFD',
+    strong: '#8A4AA8',
+  },
+  Pharmacy: {
+    border: '#F2C2CB',
+    soft: '#FDECEF',
+    strong: '#B5425A',
+  },
+  'UPS Store': {
+    border: '#E5D0AA',
+    soft: '#F8F0E1',
+    strong: '#7A5524',
+  },
+} as const;
+const fallbackAccent = {
+  border: '#D7DEE7',
+  soft: '#F0F4F8',
+  strong: '#536579',
+};
+const getCategoryAccent = (place: string) =>
+  CATEGORY_ACCENTS[place as keyof typeof CATEGORY_ACCENTS] ?? fallbackAccent;
 
 type TaskListProps = {
   remainingTaskCount: number;
   tasks: Task[];
   onAddTaskToCategory: (title: string, place: string) => void;
   onEditTask: (taskId: string, title: string) => void;
-  onExploreNearby: () => void;
   onToggleTask: (taskId: string) => void;
 };
 
@@ -32,7 +70,6 @@ export function TaskList({
   tasks,
   onAddTaskToCategory,
   onEditTask,
-  onExploreNearby,
   onToggleTask,
 }: TaskListProps) {
   const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
@@ -70,12 +107,26 @@ export function TaskList({
       return firstPlace.localeCompare(secondPlace);
     }
   );
+  const isEveryCategoryCollapsed =
+    categoryEntries.length > 0 && categoryEntries.every(([place]) => collapsedCategories[place]);
+  const toggleAllCategories = () => {
+    setCollapsedCategories(
+      categoryEntries.reduce<Record<string, boolean>>(
+        (nextCollapsedCategories, [place]) => ({
+          ...nextCollapsedCategories,
+          [place]: !isEveryCategoryCollapsed,
+        }),
+        {}
+      )
+    );
+  };
   const renderCategoryTile = ([place, placeTasks]: [string, Task[]]) => {
     const activeCount = getActiveTaskCount(placeTasks);
     const isCollapsed = collapsedCategories[place] ?? false;
     const isAdding = addingCategory === place;
     const categoryTitle = getCategoryTitle(place);
     const categoryDraft = categoryDrafts[place] ?? '';
+    const accent = getCategoryAccent(place);
     const startEditingTask = (task: Task) => {
       setEditingTaskId(task.id);
       setTaskDrafts((currentDrafts) => ({ ...currentDrafts, [task.id]: task.title }));
@@ -107,7 +158,12 @@ export function TaskList({
     };
 
     return (
-      <ThemedView key={place} style={styles.categoryTile}>
+      <ThemedView
+        key={place}
+        style={[
+          styles.categoryTile,
+          { borderColor: accent.border, borderLeftColor: accent.strong },
+        ]}>
         <ThemedView style={styles.categoryHeader}>
           <Pressable
             accessibilityLabel={`${categoryTitle}, ${activeCount} ${
@@ -132,13 +188,19 @@ export function TaskList({
               color="#60706A"
               style={styles.collapseIcon}
             />
-            <ThemedView style={styles.categorySymbolBadge}>
-              <IconSymbol name={getCategorySymbol(place)} size={23} color="#2F6B4F" />
+            <ThemedView
+              style={[
+                styles.categorySymbolBadge,
+                { backgroundColor: accent.soft, borderColor: accent.border },
+              ]}>
+              <IconSymbol name={getCategorySymbol(place)} size={23} color={accent.strong} />
             </ThemedView>
             <ThemedText numberOfLines={1} style={styles.categoryTitle}>
               {categoryTitle}
             </ThemedText>
-            <ThemedText style={styles.categoryCount}>{activeCount}</ThemedText>
+            <ThemedText style={[styles.categoryCount, { color: accent.strong }]}>
+              {activeCount}
+            </ThemedText>
           </Pressable>
           <Pressable
             accessibilityLabel={`Add item to ${categoryTitle}`}
@@ -150,8 +212,12 @@ export function TaskList({
               }));
               setAddingCategory((currentCategory) => (currentCategory === place ? null : place));
             }}
-            style={({ pressed }) => [styles.headerAddButton, pressed && styles.headerAddPressed]}>
-            <IconSymbol name="plus" size={18} color="#2F6B4F" />
+            style={({ pressed }) => [
+              styles.headerAddButton,
+              { backgroundColor: accent.soft, borderColor: accent.border },
+              pressed && styles.headerAddPressed,
+            ]}>
+            <IconSymbol name="plus" size={18} color={accent.strong} />
           </Pressable>
         </ThemedView>
 
@@ -182,6 +248,7 @@ export function TaskList({
                         style={({ pressed }) => [
                           styles.taskIconButton,
                           styles.taskSaveButton,
+                          { backgroundColor: accent.strong },
                           pressed && styles.taskIconButtonPressed,
                         ]}>
                         <IconSymbol name="checkmark" size={18} color="#FFFFFF" />
@@ -199,7 +266,11 @@ export function TaskList({
                         onPress={() => onToggleTask(task.id)}
                         style={styles.taskBulletButton}>
                         <ThemedView
-                          style={[styles.taskBullet, task.completed && styles.completedBullet]}>
+                          style={[
+                            styles.taskBullet,
+                            { borderColor: accent.strong },
+                            task.completed && { backgroundColor: accent.strong },
+                          ]}>
                           {task.completed ? <ThemedText style={styles.checkmark}>✓</ThemedText> : null}
                         </ThemedView>
                       </Pressable>
@@ -220,7 +291,11 @@ export function TaskList({
                 ))}
 
                 {isAdding ? (
-                  <ThemedView style={styles.categoryAddRow}>
+                  <ThemedView
+                    style={[
+                      styles.categoryAddRow,
+                      { backgroundColor: accent.soft, borderColor: accent.border },
+                    ]}>
                     <TextInput
                       accessibilityLabel={`Add item to ${categoryTitle}`}
                       autoFocus
@@ -243,6 +318,7 @@ export function TaskList({
                       onPress={addCategoryTask}
                       style={({ pressed }) => [
                         styles.categoryAddButton,
+                        { backgroundColor: accent.strong },
                         pressed && styles.categoryAddButtonPressed,
                       ]}>
                       <IconSymbol name="plus" size={20} color="#FFFFFF" />
@@ -267,11 +343,15 @@ export function TaskList({
             {remainingTaskCount} left
           </ThemedText>
           <Pressable
-            accessibilityHint="Opens nearby stores"
             accessibilityRole="button"
-            onPress={onExploreNearby}
-            style={({ pressed }) => [styles.exploreButton, pressed && styles.exploreButtonPressed]}>
-            <ThemedText style={styles.exploreText}>Explore</ThemedText>
+            onPress={toggleAllCategories}
+            style={({ pressed }) => [
+              styles.toggleAllButton,
+              pressed && styles.toggleAllButtonPressed,
+            ]}>
+            <ThemedText style={styles.toggleAllText}>
+              {isEveryCategoryCollapsed ? 'Expand all' : 'Collapse all'}
+            </ThemedText>
           </Pressable>
         </ThemedView>
       </ThemedView>
@@ -298,26 +378,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'transparent',
     flexDirection: 'row',
+    flexShrink: 1,
+    flexWrap: 'wrap',
     gap: 10,
+    justifyContent: 'flex-end',
   },
   sectionCount: {
     color: '#60706A',
     fontSize: 13,
     fontWeight: '700',
   },
-  exploreButton: {
-    backgroundColor: '#E7F1E7',
-    borderColor: '#CFE0CF',
+  toggleAllButton: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#DCE4DB',
     borderRadius: 999,
     borderWidth: 1,
     paddingHorizontal: 10,
     paddingVertical: 5,
   },
-  exploreButtonPressed: {
+  toggleAllButtonPressed: {
     opacity: 0.72,
   },
-  exploreText: {
-    color: '#2F6B4F',
+  toggleAllText: {
+    color: '#60706A',
     fontSize: 13,
     fontWeight: '800',
   },
@@ -329,6 +412,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderColor: '#E3E8DE',
     borderRadius: 14,
+    borderLeftWidth: 4,
     borderWidth: 1,
     gap: 8,
     padding: 12,
@@ -355,6 +439,7 @@ const styles = StyleSheet.create({
   categorySymbolBadge: {
     alignItems: 'center',
     backgroundColor: '#E7F1E7',
+    borderWidth: 1,
     borderRadius: 16,
     height: 34,
     justifyContent: 'center',

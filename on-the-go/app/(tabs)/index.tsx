@@ -1,23 +1,26 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { TaskInput } from '@/components/task-input';
+import { NearbyMapSnapshot } from '@/components/nearby-map-snapshot';
 import { TaskList } from '@/components/task-list';
 import { ThemedText } from '@/components/themed-text';
 import { useNearbyStores } from '@/hooks/use-nearby-stores';
 import { useTasks } from '@/hooks/use-tasks';
 
 export default function HomeScreen() {
-  const [taskTitle, setTaskTitle] = useState('');
   const { activeTasks, addTask, editTask, tasks, toggleTask } = useTasks();
-  const { loadNearbyStores } = useNearbyStores();
+  const { isLoading, loadNearbyStores, nearbyStores } = useNearbyStores();
+  const lastPreloadedCategoryKey = useRef<string | null>(null);
+  const activeCategoryKey = useMemo(
+    () =>
+      Array.from(new Set(activeTasks.flatMap((task) => task.places ?? [task.place])))
+        .sort()
+        .join('|'),
+    [activeTasks]
+  );
 
-  const handleAddTask = () => {
-    addTask(taskTitle);
-    setTaskTitle('');
-  };
   const handleAddTaskToCategory = (title: string, place: string) => {
     addTask(title, [place], { append: true });
   };
@@ -25,6 +28,19 @@ export default function HomeScreen() {
     router.push('/nearby');
     void loadNearbyStores(activeTasks);
   };
+
+  useEffect(() => {
+    if (!activeCategoryKey || isLoading || nearbyStores.length > 0) {
+      return;
+    }
+
+    if (lastPreloadedCategoryKey.current === activeCategoryKey) {
+      return;
+    }
+
+    lastPreloadedCategoryKey.current = activeCategoryKey;
+    void loadNearbyStores(activeTasks);
+  }, [activeCategoryKey, activeTasks, isLoading, loadNearbyStores, nearbyStores.length]);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
@@ -37,13 +53,17 @@ export default function HomeScreen() {
           What can you knock out nearby?
         </ThemedText>
 
-        <TaskInput value={taskTitle} onChangeText={setTaskTitle} onAddTask={handleAddTask} />
+        <NearbyMapSnapshot
+          activeTasks={activeTasks}
+          isLoading={isLoading}
+          nearbyStores={nearbyStores}
+          onOpenNearby={openNearbyStores}
+        />
 
         <TaskList
           tasks={tasks}
           onAddTaskToCategory={handleAddTaskToCategory}
           onEditTask={editTask}
-          onExploreNearby={openNearbyStores}
           onToggleTask={toggleTask}
           remainingTaskCount={activeTasks.length}
         />
@@ -61,7 +81,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F7F2',
   },
   container: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 14,
     paddingTop: 36,
     paddingBottom: 28,
     gap: 14,

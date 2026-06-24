@@ -19,11 +19,12 @@ Nearby store search results, because they depend on current location and can go 
 1. We should allow user to select store type "grocery/pharmacy etc" in addition to us already tagging it eg. Advil can be got from grocery + pharmacy
 2. Title tagline: Smart reminders for errands you can finish nearby.
 3. [DONE] If i mark an item done that was nearby, the nearby opportunity banner should go away
-4. Adding items text box can be made auto-complete or better?
+4. [REMOVED] Adding items text box can be made auto-complete or better?
 5. [DONE] 1 near CVS looks weird
 6. user should be able to provide location by themselves as well?
-7. Make task items editable
+7. [DONE] Make task items editable
 8. If user adds duplicate items with slightly different text- what to do?
+9. Catgeory limitation - what if someone wants to add a task that is not found on map like clean house, give candle to purva etc?
 
 # app/(tabs)/index.tsx
 

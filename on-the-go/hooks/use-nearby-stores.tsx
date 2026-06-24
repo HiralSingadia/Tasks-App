@@ -140,7 +140,7 @@ async function fetchNearbyStores(latitude: number, longitude: number) {
         'shipping_service',
         'supermarket',
       ],
-      maxResultCount: 10,
+      maxResultCount: 20,
       locationRestriction: {
         circle: {
           center: {
