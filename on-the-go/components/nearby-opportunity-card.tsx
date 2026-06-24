@@ -11,7 +11,6 @@ type NearbyOpportunityCardProps = {
   isLoadingStores: boolean;
   nearbyStores: NearbyStore[];
   onFindNearbyStores: () => void;
-  onShowMoreNearbyStores: () => void;
   suggestedTasks: Task[];
   selectedStore: NearbyStore | null;
   selectedStoreId: string | null;
@@ -53,7 +52,6 @@ export function NearbyOpportunityCard({
   isLoadingStores,
   nearbyStores,
   onFindNearbyStores,
-  onShowMoreNearbyStores,
   suggestedTasks,
   selectedStore,
   selectedStoreId,
@@ -148,14 +146,6 @@ export function NearbyOpportunityCard({
             {isLoadingStores ? 'Finding...' : 'Find nearby stores'}
           </ThemedText>
         </Pressable>
-        {hasStores ? (
-          <Pressable
-            style={[styles.secondaryButton, isLoadingStores && styles.disabledButton]}
-            onPress={onShowMoreNearbyStores}
-            disabled={isLoadingStores}>
-            <ThemedText style={styles.secondaryButtonText}>Show more</ThemedText>
-          </Pressable>
-        ) : null}
         {selectedStore ? (
           <Pressable style={styles.secondaryButton} onPress={onNotify}>
             <ThemedText style={styles.secondaryButtonText}>Notify</ThemedText>
@@ -248,7 +238,6 @@ const styles = StyleSheet.create({
   },
   actionRow: {
     backgroundColor: 'transparent',
-    flexWrap: 'wrap',
     flexDirection: 'row',
     gap: 10,
     marginTop: 12,

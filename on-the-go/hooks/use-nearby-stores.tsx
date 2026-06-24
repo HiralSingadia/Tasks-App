@@ -19,7 +19,7 @@ type GooglePlace = {
 
 type NearbyStoresContextValue = {
   isLoading: boolean;
-  loadNearbyStores: (activeTasks?: Task[], options?: LoadNearbyStoresOptions) => Promise<void>;
+  loadNearbyStores: (activeTasks?: Task[]) => Promise<void>;
   nearbyStores: NearbyStore[];
   selectedStore: NearbyStore | null;
   selectedStoreId: string | null;
@@ -27,15 +27,9 @@ type NearbyStoresContextValue = {
   status: string;
 };
 
-type LoadNearbyStoresOptions = {
-  searchFurther?: boolean;
-};
-
 const NearbyStoresContext = createContext<NearbyStoresContextValue | null>(null);
 const nearbySearchRadiusMiles = 0.5;
 const nearbySearchRadiusMeters = 805;
-const expandedSearchRadiusMiles = 1.5;
-const expandedSearchRadiusMeters = 2414;
 const maxStoresPerCategory = 5;
 
 const storeTypeMatches = [
@@ -275,19 +269,9 @@ export function NearbyStoresProvider({ children }: PropsWithChildren) {
     [nearbyStores, selectedStoreId]
   );
 
-  const loadNearbyStores = async (
-    activeTasks: Task[] = [],
-    options: LoadNearbyStoresOptions = {}
-  ) => {
-    const searchRadiusMiles = options.searchFurther
-      ? expandedSearchRadiusMiles
-      : nearbySearchRadiusMiles;
-    const searchRadiusMeters = options.searchFurther
-      ? expandedSearchRadiusMeters
-      : nearbySearchRadiusMeters;
-
+  const loadNearbyStores = async (activeTasks: Task[] = []) => {
     setIsLoading(true);
-    setStatus(options.searchFurther ? 'Searching a little farther...' : 'Checking your location...');
+    setStatus('Checking your location...');
 
     try {
       const locationPermission = await Location.requestForegroundPermissionsAsync();
@@ -307,7 +291,7 @@ export function NearbyStoresProvider({ children }: PropsWithChildren) {
       const nearbySearchStores = await fetchNearbyStores(
         location.coords.latitude,
         location.coords.longitude,
-        searchRadiusMeters
+        nearbySearchRadiusMeters
       );
       const activeCategoryStores = (
         await Promise.all(
@@ -315,7 +299,7 @@ export function NearbyStoresProvider({ children }: PropsWithChildren) {
             fetchNearbyStoresForPlace(
               location.coords.latitude,
               location.coords.longitude,
-              searchRadiusMeters,
+              nearbySearchRadiusMeters,
               place
             )
           )
@@ -325,7 +309,7 @@ export function NearbyStoresProvider({ children }: PropsWithChildren) {
         ? await fetchTextSearchStores(
             location.coords.latitude,
             location.coords.longitude,
-            searchRadiusMeters,
+            nearbySearchRadiusMeters,
             'The UPS Store',
             'UPS Store'
           )
@@ -336,7 +320,7 @@ export function NearbyStoresProvider({ children }: PropsWithChildren) {
           ...activeCategoryStores,
           ...shippingStores,
         ],
-        searchRadiusMiles
+        nearbySearchRadiusMiles
       );
       const fallbackPetStores = (
         await Promise.all(
@@ -344,7 +328,7 @@ export function NearbyStoresProvider({ children }: PropsWithChildren) {
             fetchTextSearchStores(
               location.coords.latitude,
               location.coords.longitude,
-              searchRadiusMeters,
+              nearbySearchRadiusMeters,
               'pet store',
               place
             )
@@ -358,13 +342,13 @@ export function NearbyStoresProvider({ children }: PropsWithChildren) {
           ...shippingStores,
           ...fallbackPetStores,
         ],
-        searchRadiusMiles
+        nearbySearchRadiusMiles
       );
 
       if (stores.length === 0) {
         setNearbyStores([]);
         setSelectedStoreId(null);
-        setStatus(`No matching stores found within ${searchRadiusMiles.toFixed(1)} miles.`);
+        setStatus(`No matching stores found within ${nearbySearchRadiusMiles.toFixed(1)} miles.`);
         return;
       }
 
@@ -375,7 +359,7 @@ export function NearbyStoresProvider({ children }: PropsWithChildren) {
       if (storesToShow.length === 0) {
         setNearbyStores([]);
         setSelectedStoreId(null);
-        setStatus(`No matching stores found within ${searchRadiusMiles.toFixed(1)} miles.`);
+        setStatus(`No matching stores found within ${nearbySearchRadiusMiles.toFixed(1)} miles.`);
         return;
       }
 
