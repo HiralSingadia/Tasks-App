@@ -43,7 +43,7 @@ function matchStorePlace(types: string[]) {
     storeTypeMatch.types.some((type) => types.includes(type))
   );
 
-  return matchedStoreType?.place ?? 'Nearby store';
+  return matchedStoreType?.place ?? 'Grocery store';
 }
 
 function getDistanceMiles(

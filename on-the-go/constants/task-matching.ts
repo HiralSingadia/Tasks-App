@@ -47,7 +47,7 @@ export function matchPlaces(taskTitle: string) {
     return ['Cafe or convenience store'];
   }
 
-  return ['Nearby store'];
+  return ['Grocery store'];
 }
 
 export function getPlaceLabel(places: string[]) {
@@ -55,7 +55,7 @@ export function getPlaceLabel(places: string[]) {
     return 'Grocery store or pharmacy';
   }
 
-  return places[0] ?? 'Nearby store';
+  return places[0] ?? 'Grocery store';
 }
 
 export function normalizeTaskPlaces(task: Task) {

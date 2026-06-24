@@ -17,6 +17,15 @@ export function TaskList({
   onExploreNearby,
   onToggleTask,
 }: TaskListProps) {
+  const taskGroups = tasks.reduce<Record<string, Task[]>>((groups, task) => {
+    const currentTasks = groups[task.place] ?? [];
+
+    return {
+      ...groups,
+      [task.place]: [...currentTasks, task],
+    };
+  }, {});
+
   return (
     <>
       <ThemedView style={styles.sectionHeader}>
@@ -37,22 +46,28 @@ export function TaskList({
         </ThemedView>
       </ThemedView>
 
-      {tasks.map((task) => (
-        <Pressable
-          key={task.id}
-          style={[styles.taskRow, task.completed && styles.completedRow]}
-          onPress={() => onToggleTask(task.id)}>
-          <ThemedView style={[styles.taskBullet, task.completed && styles.completedBullet]}>
-            {task.completed ? <ThemedText style={styles.checkmark}>✓</ThemedText> : null}
+      {Object.entries(taskGroups).map(([place, placeTasks]) => (
+        <ThemedView key={place} style={styles.categoryCard}>
+          <ThemedView style={styles.categoryHeader}>
+            <ThemedText style={styles.categoryTitle}>{place}</ThemedText>
+            <ThemedText style={styles.categoryCount}>
+              {placeTasks.filter((task) => !task.completed).length}
+            </ThemedText>
           </ThemedView>
 
-          <ThemedView style={styles.taskText}>
-            <ThemedText style={[styles.taskTitle, task.completed && styles.completedText]}>
-              {task.title}
-            </ThemedText>
-            <ThemedText style={styles.taskPlace}>{task.place}</ThemedText>
+          <ThemedView style={styles.chipRow}>
+            {placeTasks.map((task) => (
+              <Pressable
+                key={task.id}
+                style={[styles.taskChip, task.completed && styles.completedChip]}
+                onPress={() => onToggleTask(task.id)}>
+                <ThemedText style={[styles.chipText, task.completed && styles.completedText]}>
+                  {task.title}
+                </ThemedText>
+              </Pressable>
+            ))}
           </ThemedView>
-        </Pressable>
+        </ThemedView>
       ))}
     </>
   );
@@ -96,55 +111,55 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
   },
-  taskRow: {
+  categoryCard: {
     backgroundColor: '#FFFFFF',
     borderColor: '#E3E8DE',
     borderRadius: 14,
     borderWidth: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
     paddingHorizontal: 14,
-    paddingVertical: 13,
+    paddingVertical: 12,
   },
-  completedRow: {
-    backgroundColor: '#F7F8F4',
-    opacity: 0.68,
-  },
-  taskBullet: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#2F6B4F',
+  categoryHeader: {
     alignItems: 'center',
-    justifyContent: 'center',
     backgroundColor: 'transparent',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
-  completedBullet: {
-    backgroundColor: '#2F6B4F',
-  },
-  checkmark: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '800',
-    lineHeight: 18,
-  },
-  taskText: {
-    backgroundColor: 'transparent',
-    flex: 1,
-  },
-  taskTitle: {
-    fontSize: 16,
-    fontWeight: '600',
+  categoryTitle: {
     color: '#17231C',
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  categoryCount: {
+    color: '#60706A',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  chipRow: {
+    backgroundColor: 'transparent',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 10,
+  },
+  taskChip: {
+    backgroundColor: '#F4F7F1',
+    borderColor: '#DCE6D7',
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+  },
+  completedChip: {
+    opacity: 0.55,
+  },
+  chipText: {
+    color: '#17231C',
+    fontSize: 14,
+    fontWeight: '700',
   },
   completedText: {
     textDecorationLine: 'line-through',
-  },
-  taskPlace: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginTop: 4,
   },
 });
