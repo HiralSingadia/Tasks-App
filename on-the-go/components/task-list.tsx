@@ -363,8 +363,9 @@ const styles = StyleSheet.create({
   categoryTitle: {
     color: '#17231C',
     flex: 1,
-    fontSize: 15,
+    fontSize: 20,
     fontWeight: '800',
+    lineHeight: 25,
   },
   categoryCount: {
     color: '#2F6B4F',
@@ -390,7 +391,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
     paddingHorizontal: 2,
-    paddingVertical: 7,
+    paddingVertical: 4,
   },
   taskBulletButton: {
     alignItems: 'center',
@@ -434,9 +435,9 @@ const styles = StyleSheet.create({
   taskEditInput: {
     color: '#17231C',
     flex: 1,
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
-    lineHeight: 21,
+    lineHeight: 23,
     minHeight: 58,
     paddingVertical: 6,
     textAlignVertical: 'top',
@@ -470,9 +471,9 @@ const styles = StyleSheet.create({
   taskTitle: {
     color: '#17231C',
     flex: 1,
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
-    lineHeight: 21,
+    lineHeight: 23,
   },
   categoryAddRow: {
     alignItems: 'center',
