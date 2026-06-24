@@ -18,9 +18,9 @@ Nearby store search results, because they depend on current location and can go 
 
 1. We should allow user to select store type "grocery/pharmacy etc" in addition to us already tagging it eg. Advil can be got from grocery + pharmacy
 2. Title tagline: Smart reminders for errands you can finish nearby.
-3. If i mark an item done that was nearby, the nearby opportunity banner should go away
+3. [DONE] If i mark an item done that was nearby, the nearby opportunity banner should go away
 4. Adding items text box can be made auto-complete or better?
-5. 1 near CVS looks weird
+5. [DONE] 1 near CVS looks weird
 6. user should be able to provide location by themselves as well?
 
 # app/(tabs)/index.tsx
