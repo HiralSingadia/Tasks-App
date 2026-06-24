@@ -88,10 +88,7 @@ export function NearbyMapSnapshot({
       return firstStore.distanceMiles - secondStore.distanceMiles;
     })
     .slice(0, pinPositions.length);
-  const totalTaskCount = nearestCategoryStores.reduce(
-    (total, store) => total + store.taskCount,
-    0
-  );
+  const uniqueTaskCount = activeTasks.length;
   const closestStore = nearestCategoryStores[0];
   const title = closestStore
     ? `${nearestCategoryStores.length} nearest ${
@@ -99,7 +96,7 @@ export function NearbyMapSnapshot({
       }`
     : 'Find nearby matches';
   const subtitle = closestStore
-    ? `${totalTaskCount} ${totalTaskCount === 1 ? 'item' : 'items'} within ${snapshotRadiusMiles.toFixed(
+    ? `${uniqueTaskCount} ${uniqueTaskCount === 1 ? 'item' : 'items'} within ${snapshotRadiusMiles.toFixed(
         1
       )} mi`
     : `No matching stores within ${snapshotRadiusMiles.toFixed(1)} mi`;

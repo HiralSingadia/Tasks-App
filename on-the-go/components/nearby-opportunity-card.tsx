@@ -2,6 +2,7 @@ import { Pressable, StyleSheet } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { IconSymbol, type IconSymbolName } from '@/components/ui/icon-symbol';
 import { taskMatchesPlace } from '@/constants/task-matching';
 import type { NearbyStore } from '@/types/nearby-store';
 import type { Task } from '@/types/task';
@@ -18,6 +19,58 @@ type NearbyOpportunityCardProps = {
   onNotify: () => void;
   onSelectStore: (storeId: string) => void;
 };
+
+const CATEGORY_SYMBOLS: Record<string, IconSymbolName> = {
+  'Cafe or convenience store': 'cup.and.saucer.fill',
+  'Gas station': 'fuelpump.fill',
+  'Grocery store': 'cart.fill',
+  'Pet store': 'pawprint.fill',
+  Pharmacy: 'cross.case.fill',
+  'UPS Store': 'shippingbox.fill',
+};
+
+const CATEGORY_ACCENTS = {
+  'Cafe or convenience store': {
+    border: '#F4D7A4',
+    soft: '#FFF4DD',
+    strong: '#A35D00',
+  },
+  'Gas station': {
+    border: '#BFD7FF',
+    soft: '#EAF2FF',
+    strong: '#2765B5',
+  },
+  'Grocery store': {
+    border: '#BFE5C8',
+    soft: '#EAF8ED',
+    strong: '#2F7D4F',
+  },
+  'Pet store': {
+    border: '#E7C8F4',
+    soft: '#F8ECFD',
+    strong: '#8A4AA8',
+  },
+  Pharmacy: {
+    border: '#F2C2CB',
+    soft: '#FDECEF',
+    strong: '#B5425A',
+  },
+  'UPS Store': {
+    border: '#E5D0AA',
+    soft: '#F8F0E1',
+    strong: '#7A5524',
+  },
+} as const;
+
+const fallbackAccent = {
+  border: '#D7DEE7',
+  soft: '#F0F4F8',
+  strong: '#536579',
+};
+
+const getCategorySymbol = (place: string) => CATEGORY_SYMBOLS[place] ?? 'mappin.circle.fill';
+const getCategoryAccent = (place: string) =>
+  CATEGORY_ACCENTS[place as keyof typeof CATEGORY_ACCENTS] ?? fallbackAccent;
 
 function getCategoryLabel(place: string) {
   if (place === 'Grocery store') {
@@ -60,10 +113,6 @@ export function NearbyOpportunityCard({
   onSelectStore,
 }: NearbyOpportunityCardProps) {
   const hasStores = nearbyStores.length > 0;
-  const taskText =
-    suggestedTasks.length > 0
-      ? suggestedTasks.map((task) => task.title.toLowerCase()).join(', ')
-      : 'an errand';
   const groupedStores = nearbyStores.reduce<Record<string, NearbyStore[]>>((groups, store) => {
     const hasMatchingTasks = activeTasks.some((task) => taskMatchesPlace(task, store.place));
 
@@ -81,59 +130,96 @@ export function NearbyOpportunityCard({
 
   return (
     <ThemedView style={[styles.alertCard, !hasStores && styles.emptyCard]}>
-      <ThemedText type="subtitle" style={styles.alertTitle}>
-        Nearby opportunity
-      </ThemedText>
-      {selectedStore ? (
-        <ThemedText style={styles.alertText}>
-          {selectedStore.name} is {selectedStore.distanceMiles.toFixed(1)} miles away:{' '}
-          {selectedStore.driveMinutes} min by drive or {selectedStore.walkMinutes} min by walk. You
-          can finish {taskText} there.
+      <ThemedView style={styles.cardHeader}>
+        <ThemedView
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          style={styles.arrowBadge}>
+          <IconSymbol name="location.fill" size={18} color="#2F6B4F" />
+        </ThemedView>
+        <ThemedText type="subtitle" style={styles.alertTitle}>
+          Nearby matches
         </ThemedText>
-      ) : (
+      </ThemedView>
+      {!selectedStore ? (
         <ThemedText style={styles.emptyText}>
           Find stores that match your active errands.
         </ThemedText>
-      )}
+      ) : null}
       {status ? <ThemedText style={styles.statusText}>{status}</ThemedText> : null}
 
       {hasStores ? (
         <ThemedView style={styles.storeGroups}>
-          {Object.entries(groupedStores).map(([place, stores]) => (
-            <ThemedView key={place} style={styles.storeGroup}>
-              <ThemedText style={styles.groupTitle}>{getCategoryLabel(place)}</ThemedText>
-              <ThemedText style={styles.groupItems}>
-                {activeTasks.filter((task) => taskMatchesPlace(task, place)).length} items:{' '}
-                {activeTasks
-                  .filter((task) => taskMatchesPlace(task, place))
-                  .map((task) => task.title)
-                  .join(', ')}
-              </ThemedText>
+          {Object.entries(groupedStores).map(([place, stores]) => {
+            const matchingTaskCount = activeTasks.filter((task) =>
+              taskMatchesPlace(task, place)
+            ).length;
+            const accent = getCategoryAccent(place);
 
-              {stores.map((store) => {
-                const isSelected = selectedStoreId === store.id;
+            return (
+              <ThemedView
+                key={place}
+                style={[styles.storeGroup, { borderColor: accent.border }]}>
+                <ThemedView style={styles.groupHeader}>
+                  <ThemedView
+                    style={[
+                      styles.groupIconBadge,
+                      { backgroundColor: accent.soft, borderColor: accent.border },
+                    ]}>
+                    <IconSymbol name={getCategorySymbol(place)} size={24} color={accent.strong} />
+                  </ThemedView>
+                  <ThemedView style={styles.groupTitleBlock}>
+                    <ThemedText style={[styles.groupTitle, { color: accent.strong }]}>
+                      {getCategoryLabel(place)}
+                    </ThemedText>
+                  </ThemedView>
+                  <ThemedView style={[styles.groupCountBadge, { backgroundColor: accent.soft }]}>
+                    <ThemedText style={[styles.groupCount, { color: accent.strong }]}>
+                      {matchingTaskCount} {matchingTaskCount === 1 ? 'task' : 'tasks'}
+                    </ThemedText>
+                  </ThemedView>
+                </ThemedView>
 
-                return (
-                  <Pressable
-                    key={store.id}
-                    style={[styles.storeRow, isSelected && styles.selectedStoreRow]}
-                    onPress={() => onSelectStore(store.id)}>
-                    <ThemedView style={styles.storeHeader}>
-                      <ThemedText
-                        style={[styles.storeName, isSelected && styles.selectedStoreText]}>
-                        {store.name}
-                      </ThemedText>
-                      <ThemedText
-                        style={[styles.storeTime, isSelected && styles.selectedStoreText]}>
-                        {store.distanceMiles.toFixed(1)} mi | {store.driveMinutes}m drive |{' '}
-                        {store.walkMinutes}m walk
-                      </ThemedText>
-                    </ThemedView>
-                  </Pressable>
-                );
-              })}
-            </ThemedView>
-          ))}
+                {stores.map((store) => {
+                  const isSelected = selectedStoreId === store.id;
+
+                  return (
+                    <Pressable
+                      key={store.id}
+                      style={[
+                        styles.storeRow,
+                        { backgroundColor: accent.soft, borderColor: accent.border },
+                        isSelected && [
+                          styles.selectedStoreRow,
+                          { backgroundColor: accent.strong, borderColor: accent.strong },
+                        ],
+                      ]}
+                      onPress={() => onSelectStore(store.id)}>
+                      <ThemedView style={styles.storeHeader}>
+                        <ThemedText
+                          style={[
+                            styles.storeName,
+                            { color: accent.strong },
+                            isSelected && styles.selectedStoreText,
+                          ]}>
+                          {store.name}
+                        </ThemedText>
+                        <ThemedText
+                          style={[
+                            styles.storeTime,
+                            { color: accent.strong },
+                            isSelected && styles.selectedStoreText,
+                          ]}>
+                          {store.distanceMiles.toFixed(1)} mi | {store.driveMinutes}m drive |{' '}
+                          {store.walkMinutes}m walk
+                        </ThemedText>
+                      </ThemedView>
+                    </Pressable>
+                  );
+                })}
+              </ThemedView>
+            );
+          })}
         </ThemedView>
       ) : null}
 
@@ -158,52 +244,103 @@ export function NearbyOpportunityCard({
 
 const styles = StyleSheet.create({
   alertCard: {
-    backgroundColor: '#DFF5E1',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: '#FFFFFF',
+    borderColor: '#DCE4DB',
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#A7D8AE',
+    elevation: 3,
+    padding: 14,
+    shadowColor: '#17231C',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
   },
   emptyCard: {
     backgroundColor: '#FFFFFF',
-    borderColor: '#E3E8DE',
+    borderColor: '#DCE4DB',
   },
   alertTitle: {
-    color: '#1F4D2B',
+    color: '#17231C',
+    flex: 1,
+    fontSize: 20,
+    fontWeight: '900',
+    lineHeight: 25,
+  },
+  cardHeader: {
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+    flexDirection: 'row',
+    gap: 10,
     marginBottom: 6,
   },
-  emptyText: {
-    color: '#5C6670',
-    lineHeight: 21,
+  arrowBadge: {
+    alignItems: 'center',
+    backgroundColor: '#E7F1E7',
+    borderColor: '#CFE0CF',
+    borderRadius: 18,
+    borderWidth: 1,
+    height: 36,
+    justifyContent: 'center',
+    width: 36,
   },
-  alertText: {
-    color: '#315C3A',
+  emptyText: {
+    color: '#60706A',
+    fontWeight: '700',
     lineHeight: 21,
   },
   statusText: {
-    color: '#315C3A',
-    fontSize: 13,
-    marginTop: 8,
-    opacity: 0.85,
+    color: '#60706A',
+    fontSize: 16,
+    fontWeight: '800',
+    lineHeight: 22,
+    marginTop: 6,
   },
   storeGroups: {
     backgroundColor: 'transparent',
     marginTop: 12,
-    gap: 10,
+    gap: 12,
   },
   storeGroup: {
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    borderWidth: 1,
+    borderRadius: 12,
+    gap: 8,
+  },
+  groupHeader: {
+    alignItems: 'center',
     backgroundColor: 'transparent',
-    gap: 6,
+    flexDirection: 'row',
+    gap: 10,
+  },
+  groupIconBadge: {
+    alignItems: 'center',
+    borderRadius: 18,
+    borderWidth: 1,
+    height: 38,
+    justifyContent: 'center',
+    width: 38,
+  },
+  groupTitleBlock: {
+    backgroundColor: 'transparent',
+    flex: 1,
+    minWidth: 0,
   },
   groupTitle: {
-    color: '#1F4D2B',
-    fontSize: 13,
-    fontWeight: '800',
+    fontSize: 19,
+    fontWeight: '900',
+    lineHeight: 24,
   },
-  groupItems: {
-    color: '#315C3A',
-    fontSize: 13,
-    marginBottom: 2,
+  groupCountBadge: {
+    alignItems: 'center',
+    borderRadius: 16,
+    minWidth: 70,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  groupCount: {
+    fontSize: 14,
+    fontWeight: '900',
   },
   storeRow: {
     backgroundColor: '#F2FAF3',

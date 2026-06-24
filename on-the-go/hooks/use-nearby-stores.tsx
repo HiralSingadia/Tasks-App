@@ -364,22 +364,17 @@ export function NearbyStoresProvider({ children }: PropsWithChildren) {
       }
 
       const closestStore = storesToShow[0];
-      const completableTaskCount = activeTasks.filter((task) =>
-        storesToShow.some((store) => taskMatchesPlace(task, store.place))
-      ).length;
+      const activeTaskCount = activeTasks.length;
       const farthestUsefulStore = storesToShow.reduce((farthestStore, store) =>
         store.distanceMiles > farthestStore.distanceMiles ? store : farthestStore
-      );
-      const slowestUsefulStore = storesToShow.reduce((slowestStore, store) =>
-        store.driveMinutes > slowestStore.driveMinutes ? store : slowestStore
       );
 
       setNearbyStores(storesToShow);
       setSelectedStoreId(closestStore.id);
       setStatus(
-        `${completableTaskCount} tasks can be completed within ${farthestUsefulStore.distanceMiles.toFixed(
+        `${activeTaskCount} ${activeTaskCount === 1 ? 'task' : 'tasks'} total within ${farthestUsefulStore.distanceMiles.toFixed(
           1
-        )} miles in about ${slowestUsefulStore.driveMinutes} min by drive.`
+        )} miles.`
       );
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Unable to find nearby stores.');
