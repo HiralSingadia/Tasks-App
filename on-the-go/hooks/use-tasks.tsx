@@ -1,6 +1,11 @@
-import { createContext, PropsWithChildren, useContext, useMemo, useState } from 'react';
+import { createContext, PropsWithChildren, useContext, useEffect, useMemo, useState } from 'react';
 
-import { initialTasks, matchPlace } from '@/constants/task-matching';
+import {
+  getPlaceLabel,
+  initialTasks,
+  matchPlaces,
+  normalizeTaskPlaces,
+} from '@/constants/task-matching';
 import type { Task } from '@/types/task';
 
 type TasksContextValue = {
@@ -13,9 +18,18 @@ type TasksContextValue = {
 const TasksContext = createContext<TasksContextValue | null>(null);
 
 export function TasksProvider({ children }: PropsWithChildren) {
-  const [tasks, setTasks] = useState(initialTasks);
+  const [tasks, setTasks] = useState(() => initialTasks.map(normalizeTaskPlaces));
 
   const activeTasks = useMemo(() => tasks.filter((task) => !task.completed), [tasks]);
+
+  useEffect(() => {
+    setTasks((currentTasks) => {
+      const normalizedTasks = currentTasks.map(normalizeTaskPlaces);
+      const hasChanged = normalizedTasks.some((task, index) => task !== currentTasks[index]);
+
+      return hasChanged ? normalizedTasks : currentTasks;
+    });
+  }, []);
 
   const addTask = (title: string) => {
     const trimmedTitle = title.trim();
@@ -24,11 +38,14 @@ export function TasksProvider({ children }: PropsWithChildren) {
       return;
     }
 
+    const places = matchPlaces(trimmedTitle);
+
     setTasks((currentTasks) => [
       {
         id: Date.now().toString(),
         title: trimmedTitle,
-        place: matchPlace(trimmedTitle),
+        place: getPlaceLabel(places),
+        places,
         completed: false,
       },
       ...currentTasks,

@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 
 import { NearbyOpportunityCard } from '@/components/nearby-opportunity-card';
-import { TaskSummary } from '@/components/task-summary';
+import { taskMatchesPlace } from '@/constants/task-matching';
 import { useNearbyStores } from '@/hooks/use-nearby-stores';
 import { useOpportunityNotifications } from '@/hooks/use-opportunity-notifications';
 import { useTasks } from '@/hooks/use-tasks';
@@ -21,10 +21,9 @@ export default function NearbyScreen() {
   const { sendOpportunityNotification } = useOpportunityNotifications();
 
   const suggestedTasks = useMemo(
-    () => activeTasks.filter((task) => task.place === selectedStore.place),
+    () => activeTasks.filter((task) => taskMatchesPlace(task, selectedStore.place)),
     [activeTasks, selectedStore.place]
   );
-  const activeTaskPlaces = useMemo(() => activeTasks.map((task) => task.place), [activeTasks]);
 
   const notifyOpportunity = () => {
     sendOpportunityNotification({
@@ -40,19 +39,13 @@ export default function NearbyScreen() {
         activeTasks={activeTasks}
         isLoadingStores={isLoading}
         nearbyStores={nearbyStores}
-        onFindNearbyStores={() => loadNearbyStores(activeTaskPlaces)}
+        onFindNearbyStores={() => loadNearbyStores(activeTasks)}
         suggestedTasks={suggestedTasks}
         selectedStore={selectedStore}
         selectedStoreId={selectedStoreId}
         status={status}
         onNotify={notifyOpportunity}
         onSelectStore={setSelectedStoreId}
-      />
-
-      <TaskSummary
-        activeTaskCount={activeTasks.length}
-        nearbyTaskCount={suggestedTasks.length}
-        nearbyStoreName={selectedStore.name}
       />
     </ScrollView>
   );

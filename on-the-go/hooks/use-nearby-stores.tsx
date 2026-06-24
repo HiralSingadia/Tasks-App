@@ -1,7 +1,9 @@
-import { useMemo, useState } from 'react';
+import { createContext, PropsWithChildren, useContext, useMemo, useState } from 'react';
 import * as Location from 'expo-location';
 
+import { taskMatchesPlace } from '@/constants/task-matching';
 import type { NearbyStore } from '@/types/nearby-store';
+import type { Task } from '@/types/task';
 
 type GooglePlace = {
   id?: string;
@@ -15,21 +17,35 @@ type GooglePlace = {
   types?: string[];
 };
 
+type NearbyStoresContextValue = {
+  isLoading: boolean;
+  loadNearbyStores: (activeTasks?: Task[]) => Promise<void>;
+  nearbyStores: NearbyStore[];
+  selectedStore: NearbyStore;
+  selectedStoreId: string;
+  setSelectedStoreId: (storeId: string) => void;
+  status: string;
+};
+
+const NearbyStoresContext = createContext<NearbyStoresContextValue | null>(null);
+const nearbySearchRadiusMeters = 1200;
+const shippingSearchRadiusMeters = 8000;
+
 const demoNearbyStores: NearbyStore[] = [
   {
     distanceMiles: 0.4,
     driveMinutes: 2,
     id: 'demo-cvs',
     name: 'CVS',
-    place: 'Pharmacy or Target',
+    place: 'Pharmacy',
     walkMinutes: 8,
   },
 ];
 
 const storeTypeMatches = [
   { place: 'Grocery store', types: ['grocery_store', 'supermarket'] },
-  { place: 'Pharmacy or Target', types: ['pharmacy', 'drugstore', 'department_store'] },
-  { place: 'UPS Store', types: ['post_office'] },
+  { place: 'Pharmacy', types: ['pharmacy', 'drugstore'] },
+  { place: 'UPS Store', types: ['courier_service', 'post_office', 'shipping_service'] },
   { place: 'Cafe or convenience store', types: ['cafe', 'convenience_store'] },
 ];
 
@@ -73,6 +89,38 @@ function estimateTravelTimes(distanceMiles: number) {
   };
 }
 
+function mapGooglePlaceToNearbyStore(
+  place: GooglePlace,
+  index: number,
+  latitude: number,
+  longitude: number,
+  placeOverride?: string
+) {
+  const name = place.displayName?.text ?? 'Nearby store';
+  const distanceMiles = getDistanceMiles(
+    latitude,
+    longitude,
+    place.location?.latitude,
+    place.location?.longitude
+  );
+  const travelTimes = estimateTravelTimes(distanceMiles);
+
+  return {
+    distanceMiles,
+    driveMinutes: travelTimes.driveMinutes,
+    id: place.id ?? `${name}-${index}`,
+    name,
+    place: placeOverride ?? matchStorePlace(place.types ?? []),
+    walkMinutes: travelTimes.walkMinutes,
+  };
+}
+
+function mergeStores(stores: NearbyStore[]) {
+  return Array.from(new Map(stores.map((store) => [store.id, store])).values()).sort(
+    (firstStore, secondStore) => firstStore.distanceMiles - secondStore.distanceMiles
+  );
+}
+
 async function fetchNearbyStores(latitude: number, longitude: number) {
   const placesApiKey = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;
 
@@ -91,11 +139,12 @@ async function fetchNearbyStores(latitude: number, longitude: number) {
       includedTypes: [
         'cafe',
         'convenience_store',
-        'department_store',
+        'courier_service',
         'drugstore',
         'grocery_store',
         'pharmacy',
         'post_office',
+        'shipping_service',
         'supermarket',
       ],
       maxResultCount: 10,
@@ -105,7 +154,7 @@ async function fetchNearbyStores(latitude: number, longitude: number) {
             latitude,
             longitude,
           },
-          radius: 1200,
+          radius: nearbySearchRadiusMeters,
         },
       },
     }),
@@ -119,29 +168,57 @@ async function fetchNearbyStores(latitude: number, longitude: number) {
   const data = (await response.json()) as { places?: GooglePlace[] };
 
   return (data.places ?? [])
-    .map((place, index) => {
-      const name = place.displayName?.text ?? 'Nearby store';
-      const distanceMiles = getDistanceMiles(
-        latitude,
-        longitude,
-        place.location?.latitude,
-        place.location?.longitude
-      );
-      const travelTimes = estimateTravelTimes(distanceMiles);
-
-      return {
-        distanceMiles,
-        driveMinutes: travelTimes.driveMinutes,
-        id: place.id ?? `${name}-${index}`,
-        name,
-        place: matchStorePlace(place.types ?? []),
-        walkMinutes: travelTimes.walkMinutes,
-      };
-    })
+    .map((place, index) => mapGooglePlaceToNearbyStore(place, index, latitude, longitude))
     .sort((firstStore, secondStore) => firstStore.distanceMiles - secondStore.distanceMiles);
 }
 
-export function useNearbyStores() {
+async function fetchTextSearchStores(
+  latitude: number,
+  longitude: number,
+  textQuery: string,
+  placeOverride: string
+) {
+  const placesApiKey = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;
+
+  if (!placesApiKey) {
+    throw new Error('Add EXPO_PUBLIC_GOOGLE_PLACES_API_KEY to use real nearby stores.');
+  }
+
+  const response = await fetch('https://places.googleapis.com/v1/places:searchText', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Goog-Api-Key': placesApiKey,
+      'X-Goog-FieldMask': 'places.id,places.displayName,places.location,places.types',
+    },
+    body: JSON.stringify({
+      textQuery,
+      pageSize: 5,
+      locationBias: {
+        circle: {
+          center: {
+            latitude,
+            longitude,
+          },
+          radius: shippingSearchRadiusMeters,
+        },
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Places API error ${response.status}: ${errorText}`);
+  }
+
+  const data = (await response.json()) as { places?: GooglePlace[] };
+
+  return (data.places ?? []).map((place, index) =>
+    mapGooglePlaceToNearbyStore(place, index, latitude, longitude, placeOverride)
+  );
+}
+
+export function NearbyStoresProvider({ children }: PropsWithChildren) {
   const [nearbyStores, setNearbyStores] = useState(demoNearbyStores);
   const [selectedStoreId, setSelectedStoreId] = useState(demoNearbyStores[0].id);
   const [status, setStatus] = useState('Using demo nearby store.');
@@ -152,7 +229,7 @@ export function useNearbyStores() {
     [nearbyStores, selectedStoreId]
   );
 
-  const loadNearbyStores = async (activeTaskPlaces: string[] = []) => {
+  const loadNearbyStores = async (activeTasks: Task[] = []) => {
     setIsLoading(true);
     setStatus('Checking your location...');
 
@@ -167,18 +244,33 @@ export function useNearbyStores() {
       const location = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       });
-      const stores = await fetchNearbyStores(location.coords.latitude, location.coords.longitude);
+      const hasShippingTask = activeTasks.some((task) => taskMatchesPlace(task, 'UPS Store'));
+      const nearbySearchStores = await fetchNearbyStores(
+        location.coords.latitude,
+        location.coords.longitude
+      );
+      const shippingStores = hasShippingTask
+        ? await fetchTextSearchStores(
+            location.coords.latitude,
+            location.coords.longitude,
+            'The UPS Store',
+            'UPS Store'
+          )
+        : [];
+      const stores = mergeStores([...nearbySearchStores, ...shippingStores]);
 
       if (stores.length === 0) {
         setStatus('No matching stores found nearby.');
         return;
       }
 
-      const usefulStores = stores.filter((store) => activeTaskPlaces.includes(store.place));
+      const usefulStores = stores.filter((store) =>
+        activeTasks.some((task) => taskMatchesPlace(task, store.place))
+      );
       const storesToShow = usefulStores.length > 0 ? usefulStores : stores;
       const closestStore = storesToShow[0];
-      const completableTaskCount = activeTaskPlaces.filter((place) =>
-        storesToShow.some((store) => store.place === place)
+      const completableTaskCount = activeTasks.filter((task) =>
+        storesToShow.some((store) => taskMatchesPlace(task, store.place))
       ).length;
       const farthestUsefulStore = storesToShow.reduce((farthestStore, store) =>
         store.distanceMiles > farthestStore.distanceMiles ? store : farthestStore
@@ -201,7 +293,7 @@ export function useNearbyStores() {
     }
   };
 
-  return {
+  const value = {
     isLoading,
     loadNearbyStores,
     nearbyStores,
@@ -210,4 +302,16 @@ export function useNearbyStores() {
     setSelectedStoreId,
     status,
   };
+
+  return <NearbyStoresContext.Provider value={value}>{children}</NearbyStoresContext.Provider>;
+}
+
+export function useNearbyStores() {
+  const context = useContext(NearbyStoresContext);
+
+  if (!context) {
+    throw new Error('useNearbyStores must be used within NearbyStoresProvider');
+  }
+
+  return context;
 }

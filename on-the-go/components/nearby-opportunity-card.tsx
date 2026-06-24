@@ -2,6 +2,7 @@ import { Pressable, StyleSheet } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { taskMatchesPlace } from '@/constants/task-matching';
 import type { NearbyStore } from '@/types/nearby-store';
 import type { Task } from '@/types/task';
 
@@ -23,7 +24,7 @@ function getCategoryLabel(place: string) {
     return 'Grocery';
   }
 
-  if (place === 'Pharmacy or Target') {
+  if (place === 'Pharmacy') {
     return 'Pharmacy';
   }
 
@@ -55,7 +56,7 @@ export function NearbyOpportunityCard({
       ? suggestedTasks.map((task) => task.title.toLowerCase()).join(', ')
       : 'an errand';
   const groupedStores = nearbyStores.reduce<Record<string, NearbyStore[]>>((groups, store) => {
-    const hasMatchingTasks = activeTasks.some((task) => task.place === store.place);
+    const hasMatchingTasks = activeTasks.some((task) => taskMatchesPlace(task, store.place));
 
     if (!hasMatchingTasks) {
       return groups;
@@ -86,9 +87,9 @@ export function NearbyOpportunityCard({
           <ThemedView key={place} style={styles.storeGroup}>
             <ThemedText style={styles.groupTitle}>{getCategoryLabel(place)}</ThemedText>
             <ThemedText style={styles.groupItems}>
-              {activeTasks.filter((task) => task.place === place).length} items:{' '}
+              {activeTasks.filter((task) => taskMatchesPlace(task, place)).length} items:{' '}
               {activeTasks
-                .filter((task) => task.place === place)
+                .filter((task) => taskMatchesPlace(task, place))
                 .map((task) => task.title)
                 .join(', ')}
             </ThemedText>
