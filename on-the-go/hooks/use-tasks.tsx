@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, PropsWithChildren, useContext, useEffect, useMemo, useState } from 'react';
 
 import {
@@ -16,20 +17,89 @@ type TasksContextValue = {
 };
 
 const TasksContext = createContext<TasksContextValue | null>(null);
+const tasksStorageKey = 'on-the-go.tasks.v1';
+
+function getInitialTasks() {
+  return initialTasks.map(normalizeTaskPlaces);
+}
+
+function getNormalizedTasks(tasks: Task[]) {
+  return tasks.map(normalizeTaskPlaces);
+}
+
+function isTaskArray(value: unknown): value is Task[] {
+  return (
+    Array.isArray(value) &&
+    value.every(
+      (task) =>
+        task &&
+        typeof task === 'object' &&
+        typeof (task as Task).id === 'string' &&
+        typeof (task as Task).title === 'string' &&
+        typeof (task as Task).place === 'string' &&
+        typeof (task as Task).completed === 'boolean'
+    )
+  );
+}
 
 export function TasksProvider({ children }: PropsWithChildren) {
-  const [tasks, setTasks] = useState(() => initialTasks.map(normalizeTaskPlaces));
+  const [tasks, setTasks] = useState(getInitialTasks);
+  const [hasLoadedStoredTasks, setHasLoadedStoredTasks] = useState(false);
 
   const activeTasks = useMemo(() => tasks.filter((task) => !task.completed), [tasks]);
 
   useEffect(() => {
-    setTasks((currentTasks) => {
-      const normalizedTasks = currentTasks.map(normalizeTaskPlaces);
-      const hasChanged = normalizedTasks.some((task, index) => task !== currentTasks[index]);
+    let isMounted = true;
 
-      return hasChanged ? normalizedTasks : currentTasks;
-    });
+    async function loadStoredTasks() {
+      try {
+        const storedTasks = await AsyncStorage.getItem(tasksStorageKey);
+
+        if (!isMounted) {
+          return;
+        }
+
+        if (!storedTasks) {
+          setTasks(getInitialTasks());
+          return;
+        }
+
+        const parsedTasks: unknown = JSON.parse(storedTasks);
+
+        if (!isTaskArray(parsedTasks)) {
+          setTasks(getInitialTasks());
+          return;
+        }
+
+        setTasks(getNormalizedTasks(parsedTasks));
+      } catch (error) {
+        console.warn('Unable to load saved tasks.', error);
+        setTasks(getInitialTasks());
+      } finally {
+        if (isMounted) {
+          setHasLoadedStoredTasks(true);
+        }
+      }
+    }
+
+    loadStoredTasks();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
+
+  useEffect(() => {
+    if (!hasLoadedStoredTasks) {
+      return;
+    }
+
+    const tasksToSave = tasks.filter((task) => !task.completed);
+
+    AsyncStorage.setItem(tasksStorageKey, JSON.stringify(tasksToSave)).catch((error) => {
+      console.warn('Unable to save tasks.', error);
+    });
+  }, [hasLoadedStoredTasks, tasks]);
 
   const addTask = (title: string) => {
     const trimmedTitle = title.trim();

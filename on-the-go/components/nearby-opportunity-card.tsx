@@ -12,8 +12,8 @@ type NearbyOpportunityCardProps = {
   nearbyStores: NearbyStore[];
   onFindNearbyStores: () => void;
   suggestedTasks: Task[];
-  selectedStore: NearbyStore;
-  selectedStoreId: string;
+  selectedStore: NearbyStore | null;
+  selectedStoreId: string | null;
   status: string;
   onNotify: () => void;
   onSelectStore: (storeId: string) => void;
@@ -51,6 +51,7 @@ export function NearbyOpportunityCard({
   onNotify,
   onSelectStore,
 }: NearbyOpportunityCardProps) {
+  const hasStores = nearbyStores.length > 0;
   const taskText =
     suggestedTasks.length > 0
       ? suggestedTasks.map((task) => task.title.toLowerCase()).join(', ')
@@ -71,52 +72,62 @@ export function NearbyOpportunityCard({
   }, {});
 
   return (
-    <ThemedView style={styles.alertCard}>
+    <ThemedView style={[styles.alertCard, !hasStores && styles.emptyCard]}>
       <ThemedText type="subtitle" style={styles.alertTitle}>
         Nearby opportunity
       </ThemedText>
-      <ThemedText style={styles.alertText}>
-        {selectedStore.name} is {selectedStore.distanceMiles.toFixed(1)} miles away:{' '}
-        {selectedStore.driveMinutes} min by drive or {selectedStore.walkMinutes} min by walk. You
-        can finish {taskText} there.
-      </ThemedText>
-      <ThemedText style={styles.statusText}>{status}</ThemedText>
+      {selectedStore ? (
+        <ThemedText style={styles.alertText}>
+          {selectedStore.name} is {selectedStore.distanceMiles.toFixed(1)} miles away:{' '}
+          {selectedStore.driveMinutes} min by drive or {selectedStore.walkMinutes} min by walk. You
+          can finish {taskText} there.
+        </ThemedText>
+      ) : (
+        <ThemedText style={styles.emptyText}>
+          Find stores that match your active errands.
+        </ThemedText>
+      )}
+      {status ? <ThemedText style={styles.statusText}>{status}</ThemedText> : null}
 
-      <ThemedView style={styles.storeGroups}>
-        {Object.entries(groupedStores).map(([place, stores]) => (
-          <ThemedView key={place} style={styles.storeGroup}>
-            <ThemedText style={styles.groupTitle}>{getCategoryLabel(place)}</ThemedText>
-            <ThemedText style={styles.groupItems}>
-              {activeTasks.filter((task) => taskMatchesPlace(task, place)).length} items:{' '}
-              {activeTasks
-                .filter((task) => taskMatchesPlace(task, place))
-                .map((task) => task.title)
-                .join(', ')}
-            </ThemedText>
+      {hasStores ? (
+        <ThemedView style={styles.storeGroups}>
+          {Object.entries(groupedStores).map(([place, stores]) => (
+            <ThemedView key={place} style={styles.storeGroup}>
+              <ThemedText style={styles.groupTitle}>{getCategoryLabel(place)}</ThemedText>
+              <ThemedText style={styles.groupItems}>
+                {activeTasks.filter((task) => taskMatchesPlace(task, place)).length} items:{' '}
+                {activeTasks
+                  .filter((task) => taskMatchesPlace(task, place))
+                  .map((task) => task.title)
+                  .join(', ')}
+              </ThemedText>
 
-            {stores.map((store) => {
-              const isSelected = selectedStoreId === store.id;
+              {stores.map((store) => {
+                const isSelected = selectedStoreId === store.id;
 
-              return (
-                <Pressable
-                  key={store.id}
-                  style={[styles.storeRow, isSelected && styles.selectedStoreRow]}
-                  onPress={() => onSelectStore(store.id)}>
-                  <ThemedView style={styles.storeHeader}>
-                    <ThemedText style={[styles.storeName, isSelected && styles.selectedStoreText]}>
-                      {store.name}
-                    </ThemedText>
-                    <ThemedText style={[styles.storeTime, isSelected && styles.selectedStoreText]}>
-                      {store.distanceMiles.toFixed(1)} mi | {store.driveMinutes}m drive |{' '}
-                      {store.walkMinutes}m walk
-                    </ThemedText>
-                  </ThemedView>
-                </Pressable>
-              );
-            })}
-          </ThemedView>
-        ))}
-      </ThemedView>
+                return (
+                  <Pressable
+                    key={store.id}
+                    style={[styles.storeRow, isSelected && styles.selectedStoreRow]}
+                    onPress={() => onSelectStore(store.id)}>
+                    <ThemedView style={styles.storeHeader}>
+                      <ThemedText
+                        style={[styles.storeName, isSelected && styles.selectedStoreText]}>
+                        {store.name}
+                      </ThemedText>
+                      <ThemedText
+                        style={[styles.storeTime, isSelected && styles.selectedStoreText]}>
+                        {store.distanceMiles.toFixed(1)} mi | {store.driveMinutes}m drive |{' '}
+                        {store.walkMinutes}m walk
+                      </ThemedText>
+                    </ThemedView>
+                  </Pressable>
+                );
+              })}
+            </ThemedView>
+          ))}
+        </ThemedView>
+      ) : null}
 
       <ThemedView style={styles.actionRow}>
         <Pressable
@@ -127,9 +138,11 @@ export function NearbyOpportunityCard({
             {isLoadingStores ? 'Finding...' : 'Find nearby stores'}
           </ThemedText>
         </Pressable>
-        <Pressable style={styles.secondaryButton} onPress={onNotify}>
-          <ThemedText style={styles.secondaryButtonText}>Notify</ThemedText>
-        </Pressable>
+        {selectedStore ? (
+          <Pressable style={styles.secondaryButton} onPress={onNotify}>
+            <ThemedText style={styles.secondaryButtonText}>Notify</ThemedText>
+          </Pressable>
+        ) : null}
       </ThemedView>
     </ThemedView>
   );
@@ -143,9 +156,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#A7D8AE',
   },
+  emptyCard: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#E3E8DE',
+  },
   alertTitle: {
     color: '#1F4D2B',
     marginBottom: 6,
+  },
+  emptyText: {
+    color: '#5C6670',
+    lineHeight: 21,
   },
   alertText: {
     color: '#315C3A',

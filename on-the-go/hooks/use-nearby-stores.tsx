@@ -21,8 +21,8 @@ type NearbyStoresContextValue = {
   isLoading: boolean;
   loadNearbyStores: (activeTasks?: Task[]) => Promise<void>;
   nearbyStores: NearbyStore[];
-  selectedStore: NearbyStore;
-  selectedStoreId: string;
+  selectedStore: NearbyStore | null;
+  selectedStoreId: string | null;
   setSelectedStoreId: (storeId: string) => void;
   status: string;
 };
@@ -30,17 +30,6 @@ type NearbyStoresContextValue = {
 const NearbyStoresContext = createContext<NearbyStoresContextValue | null>(null);
 const nearbySearchRadiusMeters = 1200;
 const shippingSearchRadiusMeters = 8000;
-
-const demoNearbyStores: NearbyStore[] = [
-  {
-    distanceMiles: 0.4,
-    driveMinutes: 2,
-    id: 'demo-cvs',
-    name: 'CVS',
-    place: 'Pharmacy',
-    walkMinutes: 8,
-  },
-];
 
 const storeTypeMatches = [
   { place: 'Grocery store', types: ['grocery_store', 'supermarket'] },
@@ -219,13 +208,13 @@ async function fetchTextSearchStores(
 }
 
 export function NearbyStoresProvider({ children }: PropsWithChildren) {
-  const [nearbyStores, setNearbyStores] = useState(demoNearbyStores);
-  const [selectedStoreId, setSelectedStoreId] = useState(demoNearbyStores[0].id);
-  const [status, setStatus] = useState('Using demo nearby store.');
+  const [nearbyStores, setNearbyStores] = useState<NearbyStore[]>([]);
+  const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
+  const [status, setStatus] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const selectedStore = useMemo(
-    () => nearbyStores.find((store) => store.id === selectedStoreId) ?? nearbyStores[0],
+    () => nearbyStores.find((store) => store.id === selectedStoreId) ?? nearbyStores[0] ?? null,
     [nearbyStores, selectedStoreId]
   );
 
@@ -260,6 +249,8 @@ export function NearbyStoresProvider({ children }: PropsWithChildren) {
       const stores = mergeStores([...nearbySearchStores, ...shippingStores]);
 
       if (stores.length === 0) {
+        setNearbyStores([]);
+        setSelectedStoreId(null);
         setStatus('No matching stores found nearby.');
         return;
       }

@@ -1,7 +1,18 @@
 <!-- Hiral's Readme -->
 
 npx expo start -c
-ok this is my test
+
+<!-- PERSISTANT STATE -->
+# What is persisted
+
+Task title
+Completed state
+Display place
+Matching places
+
+# What is not persisted
+
+Nearby store search results, because they depend on current location and can go stale
 
 # TODO
 

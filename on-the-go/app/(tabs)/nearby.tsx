@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { NearbyOpportunityCard } from '@/components/nearby-opportunity-card';
 import { taskMatchesPlace } from '@/constants/task-matching';
@@ -21,11 +22,18 @@ export default function NearbyScreen() {
   const { sendOpportunityNotification } = useOpportunityNotifications();
 
   const suggestedTasks = useMemo(
-    () => activeTasks.filter((task) => taskMatchesPlace(task, selectedStore.place)),
-    [activeTasks, selectedStore.place]
+    () =>
+      selectedStore
+        ? activeTasks.filter((task) => taskMatchesPlace(task, selectedStore.place))
+        : [],
+    [activeTasks, selectedStore]
   );
 
   const notifyOpportunity = () => {
+    if (!selectedStore) {
+      return;
+    }
+
     sendOpportunityNotification({
       distanceMinutes: selectedStore.driveMinutes,
       storeName: selectedStore.name,
@@ -34,30 +42,37 @@ export default function NearbyScreen() {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container} style={styles.screen}>
-      <NearbyOpportunityCard
-        activeTasks={activeTasks}
-        isLoadingStores={isLoading}
-        nearbyStores={nearbyStores}
-        onFindNearbyStores={() => loadNearbyStores(activeTasks)}
-        suggestedTasks={suggestedTasks}
-        selectedStore={selectedStore}
-        selectedStoreId={selectedStoreId}
-        status={status}
-        onNotify={notifyOpportunity}
-        onSelectStore={setSelectedStoreId}
-      />
-    </ScrollView>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <ScrollView contentContainerStyle={styles.container} style={styles.screen}>
+        <NearbyOpportunityCard
+          activeTasks={activeTasks}
+          isLoadingStores={isLoading}
+          nearbyStores={nearbyStores}
+          onFindNearbyStores={() => loadNearbyStores(activeTasks)}
+          suggestedTasks={suggestedTasks}
+          selectedStore={selectedStore}
+          selectedStoreId={selectedStoreId}
+          status={status}
+          onNotify={notifyOpportunity}
+          onSelectStore={setSelectedStoreId}
+        />
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#F5F7F2',
+  },
   screen: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F5F7F2',
   },
   container: {
-    backgroundColor: '#FFFFFF',
-    padding: 24,
+    paddingHorizontal: 20,
+    paddingTop: 36,
+    paddingBottom: 28,
     gap: 12,
     flexGrow: 1,
   },
