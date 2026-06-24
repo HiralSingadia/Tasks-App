@@ -21,7 +21,7 @@ type NearbyOpportunityCardProps = {
 
 function getCategoryLabel(place: string) {
   if (place === 'Grocery store') {
-    return 'Grocery';
+    return 'Groceries';
   }
 
   if (place === 'Pharmacy') {
@@ -30,6 +30,14 @@ function getCategoryLabel(place: string) {
 
   if (place === 'UPS Store') {
     return 'UPS';
+  }
+
+  if (place === 'Pet store') {
+    return 'Pet';
+  }
+
+  if (place === 'Gas station') {
+    return 'Gas';
   }
 
   if (place === 'Cafe or convenience store') {

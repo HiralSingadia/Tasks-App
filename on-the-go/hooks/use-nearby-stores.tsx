@@ -35,6 +35,8 @@ const storeTypeMatches = [
   { place: 'Grocery store', types: ['grocery_store', 'supermarket'] },
   { place: 'Pharmacy', types: ['pharmacy', 'drugstore'] },
   { place: 'UPS Store', types: ['courier_service', 'post_office', 'shipping_service'] },
+  { place: 'Pet store', types: ['pet_store'] },
+  { place: 'Gas station', types: ['gas_station'] },
   { place: 'Cafe or convenience store', types: ['cafe', 'convenience_store'] },
 ];
 
@@ -130,7 +132,9 @@ async function fetchNearbyStores(latitude: number, longitude: number) {
         'convenience_store',
         'courier_service',
         'drugstore',
+        'gas_station',
         'grocery_store',
+        'pet_store',
         'pharmacy',
         'post_office',
         'shipping_service',

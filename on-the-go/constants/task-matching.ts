@@ -43,6 +43,14 @@ export function matchPlaces(taskTitle: string) {
     return ['UPS Store'];
   }
 
+  if (/(pet|dog|cat|litter|kibble|animal|treats|leash|poop bags)/.test(normalizedTitle)) {
+    return ['Pet store'];
+  }
+
+  if (/(gas|fuel|car wash|windshield|wiper fluid|tire pressure)/.test(normalizedTitle)) {
+    return ['Gas station'];
+  }
+
   if (/(coffee|snack|lunch|sandwich)/.test(normalizedTitle)) {
     return ['Cafe or convenience store'];
   }

@@ -22,6 +22,8 @@ Nearby store search results, because they depend on current location and can go 
 4. Adding items text box can be made auto-complete or better?
 5. [DONE] 1 near CVS looks weird
 6. user should be able to provide location by themselves as well?
+7. Make task items editable
+8. If user adds duplicate items with slightly different text- what to do?
 
 # app/(tabs)/index.tsx
 

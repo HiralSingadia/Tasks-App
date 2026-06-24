@@ -33,9 +33,6 @@ export default function HomeScreen() {
         <ThemedText type="title" style={styles.title}>
           What can you knock out nearby?
         </ThemedText>
-        <ThemedText style={styles.subtitle}>
-          Add errands here and the app will match them to places around you.
-        </ThemedText>
 
         <TaskInput value={taskTitle} onChangeText={setTaskTitle} onAddTask={handleAddTask} />
 
@@ -77,11 +74,5 @@ const styles = StyleSheet.create({
     fontSize: 32,
     lineHeight: 38,
     marginTop: 2,
-  },
-  subtitle: {
-    color: '#5C6670',
-    fontSize: 16,
-    lineHeight: 23,
-    marginBottom: 8,
   },
 });
