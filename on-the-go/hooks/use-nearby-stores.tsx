@@ -19,7 +19,7 @@ type GooglePlace = {
 
 type NearbyStoresContextValue = {
   isLoading: boolean;
-  loadNearbyStores: (activeTasks?: Task[]) => Promise<void>;
+  loadNearbyStores: (activeTasks?: Task[], options?: LoadNearbyStoresOptions) => Promise<void>;
   nearbyStores: NearbyStore[];
   selectedStore: NearbyStore | null;
   selectedStoreId: string | null;
@@ -27,9 +27,16 @@ type NearbyStoresContextValue = {
   status: string;
 };
 
+type LoadNearbyStoresOptions = {
+  searchFurther?: boolean;
+};
+
 const NearbyStoresContext = createContext<NearbyStoresContextValue | null>(null);
-const nearbySearchRadiusMeters = 1200;
-const shippingSearchRadiusMeters = 8000;
+const nearbySearchRadiusMiles = 0.5;
+const nearbySearchRadiusMeters = 805;
+const expandedSearchRadiusMiles = 1.5;
+const expandedSearchRadiusMeters = 2414;
+const maxStoresPerCategory = 5;
 
 const storeTypeMatches = [
   { place: 'Grocery store', types: ['grocery_store', 'supermarket'] },
@@ -106,13 +113,53 @@ function mapGooglePlaceToNearbyStore(
   };
 }
 
-function mergeStores(stores: NearbyStore[]) {
-  return Array.from(new Map(stores.map((store) => [store.id, store])).values()).sort(
-    (firstStore, secondStore) => firstStore.distanceMiles - secondStore.distanceMiles
-  );
+function mergeStores(stores: NearbyStore[], searchRadiusMiles: number) {
+  return Array.from(new Map(stores.map((store) => [store.id, store])).values())
+    .filter((store) => store.distanceMiles <= searchRadiusMiles)
+    .sort((firstStore, secondStore) => firstStore.distanceMiles - secondStore.distanceMiles);
 }
 
-async function fetchNearbyStores(latitude: number, longitude: number) {
+function prioritizeStoresForActivePlaces(stores: NearbyStore[], activePlaces: string[]) {
+  const nearestStoreByActivePlace = activePlaces
+    .map((place) => stores.find((store) => store.place === place))
+    .filter((store): store is NearbyStore => Boolean(store));
+  const prioritizedStoreIds = new Set(nearestStoreByActivePlace.map((store) => store.id));
+  const additionalMatchingStores = stores.filter(
+    (store) => activePlaces.includes(store.place) && !prioritizedStoreIds.has(store.id)
+  );
+
+  return [...nearestStoreByActivePlace, ...additionalMatchingStores];
+}
+
+function limitStoresPerCategory(stores: NearbyStore[]) {
+  const storeCountByCategory = new Map<string, number>();
+
+  return stores.filter((store) => {
+    const currentCount = storeCountByCategory.get(store.place) ?? 0;
+
+    if (currentCount >= maxStoresPerCategory) {
+      return false;
+    }
+
+    storeCountByCategory.set(store.place, currentCount + 1);
+    return true;
+  });
+}
+
+function getMissingPetStoreFallbackPlaces(stores: NearbyStore[], activePlaces: string[]) {
+  const needsPetStoreFallback =
+    activePlaces.includes('Pet store') && !stores.some((store) => store.place === 'Pet store');
+
+  return needsPetStoreFallback ? ['Pet store'] : [];
+}
+
+async function fetchNearbyStores(
+  latitude: number,
+  longitude: number,
+  searchRadiusMeters: number,
+  includedTypes: string[] = storeTypeMatches.flatMap((storeTypeMatch) => storeTypeMatch.types),
+  placeOverride?: string
+) {
   const placesApiKey = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;
 
   if (!placesApiKey) {
@@ -127,19 +174,7 @@ async function fetchNearbyStores(latitude: number, longitude: number) {
       'X-Goog-FieldMask': 'places.id,places.displayName,places.location,places.types',
     },
     body: JSON.stringify({
-      includedTypes: [
-        'cafe',
-        'convenience_store',
-        'courier_service',
-        'drugstore',
-        'gas_station',
-        'grocery_store',
-        'pet_store',
-        'pharmacy',
-        'post_office',
-        'shipping_service',
-        'supermarket',
-      ],
+      includedTypes,
       maxResultCount: 20,
       locationRestriction: {
         circle: {
@@ -147,7 +182,7 @@ async function fetchNearbyStores(latitude: number, longitude: number) {
             latitude,
             longitude,
           },
-          radius: nearbySearchRadiusMeters,
+          radius: searchRadiusMeters,
         },
       },
     }),
@@ -161,13 +196,31 @@ async function fetchNearbyStores(latitude: number, longitude: number) {
   const data = (await response.json()) as { places?: GooglePlace[] };
 
   return (data.places ?? [])
-    .map((place, index) => mapGooglePlaceToNearbyStore(place, index, latitude, longitude))
+    .map((place, index) =>
+      mapGooglePlaceToNearbyStore(place, index, latitude, longitude, placeOverride)
+    )
     .sort((firstStore, secondStore) => firstStore.distanceMiles - secondStore.distanceMiles);
+}
+
+async function fetchNearbyStoresForPlace(
+  latitude: number,
+  longitude: number,
+  searchRadiusMeters: number,
+  place: string
+) {
+  const storeTypeMatch = storeTypeMatches.find((match) => match.place === place);
+
+  if (!storeTypeMatch) {
+    return [];
+  }
+
+  return fetchNearbyStores(latitude, longitude, searchRadiusMeters, storeTypeMatch.types, place);
 }
 
 async function fetchTextSearchStores(
   latitude: number,
   longitude: number,
+  searchRadiusMeters: number,
   textQuery: string,
   placeOverride: string
 ) {
@@ -193,7 +246,7 @@ async function fetchTextSearchStores(
             latitude,
             longitude,
           },
-          radius: shippingSearchRadiusMeters,
+          radius: searchRadiusMeters,
         },
       },
     }),
@@ -222,9 +275,19 @@ export function NearbyStoresProvider({ children }: PropsWithChildren) {
     [nearbyStores, selectedStoreId]
   );
 
-  const loadNearbyStores = async (activeTasks: Task[] = []) => {
+  const loadNearbyStores = async (
+    activeTasks: Task[] = [],
+    options: LoadNearbyStoresOptions = {}
+  ) => {
+    const searchRadiusMiles = options.searchFurther
+      ? expandedSearchRadiusMiles
+      : nearbySearchRadiusMiles;
+    const searchRadiusMeters = options.searchFurther
+      ? expandedSearchRadiusMeters
+      : nearbySearchRadiusMeters;
+
     setIsLoading(true);
-    setStatus('Checking your location...');
+    setStatus(options.searchFurther ? 'Searching a little farther...' : 'Checking your location...');
 
     try {
       const locationPermission = await Location.requestForegroundPermissionsAsync();
@@ -237,32 +300,85 @@ export function NearbyStoresProvider({ children }: PropsWithChildren) {
       const location = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       });
+      const activePlaces = storeTypeMatches
+        .map((storeTypeMatch) => storeTypeMatch.place)
+        .filter((place) => activeTasks.some((task) => taskMatchesPlace(task, place)));
       const hasShippingTask = activeTasks.some((task) => taskMatchesPlace(task, 'UPS Store'));
       const nearbySearchStores = await fetchNearbyStores(
         location.coords.latitude,
-        location.coords.longitude
+        location.coords.longitude,
+        searchRadiusMeters
       );
+      const activeCategoryStores = (
+        await Promise.all(
+          activePlaces.map((place) =>
+            fetchNearbyStoresForPlace(
+              location.coords.latitude,
+              location.coords.longitude,
+              searchRadiusMeters,
+              place
+            )
+          )
+        )
+      ).flat();
       const shippingStores = hasShippingTask
         ? await fetchTextSearchStores(
             location.coords.latitude,
             location.coords.longitude,
+            searchRadiusMeters,
             'The UPS Store',
             'UPS Store'
           )
         : [];
-      const stores = mergeStores([...nearbySearchStores, ...shippingStores]);
+      const initialStores = mergeStores(
+        [
+          ...nearbySearchStores,
+          ...activeCategoryStores,
+          ...shippingStores,
+        ],
+        searchRadiusMiles
+      );
+      const fallbackPetStores = (
+        await Promise.all(
+          getMissingPetStoreFallbackPlaces(initialStores, activePlaces).map((place) =>
+            fetchTextSearchStores(
+              location.coords.latitude,
+              location.coords.longitude,
+              searchRadiusMeters,
+              'pet store',
+              place
+            )
+          )
+        )
+      ).flat();
+      const stores = mergeStores(
+        [
+          ...nearbySearchStores,
+          ...activeCategoryStores,
+          ...shippingStores,
+          ...fallbackPetStores,
+        ],
+        searchRadiusMiles
+      );
 
       if (stores.length === 0) {
         setNearbyStores([]);
         setSelectedStoreId(null);
-        setStatus('No matching stores found nearby.');
+        setStatus(`No matching stores found within ${searchRadiusMiles.toFixed(1)} miles.`);
         return;
       }
 
-      const usefulStores = stores.filter((store) =>
-        activeTasks.some((task) => taskMatchesPlace(task, store.place))
+      const storesToShow = limitStoresPerCategory(
+        activePlaces.length > 0 ? prioritizeStoresForActivePlaces(stores, activePlaces) : stores
       );
-      const storesToShow = usefulStores.length > 0 ? usefulStores : stores;
+
+      if (storesToShow.length === 0) {
+        setNearbyStores([]);
+        setSelectedStoreId(null);
+        setStatus(`No matching stores found within ${searchRadiusMiles.toFixed(1)} miles.`);
+        return;
+      }
+
       const closestStore = storesToShow[0];
       const completableTaskCount = activeTasks.filter((task) =>
         storesToShow.some((store) => taskMatchesPlace(task, store.place))

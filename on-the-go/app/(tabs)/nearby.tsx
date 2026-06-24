@@ -49,6 +49,7 @@ export default function NearbyScreen() {
           isLoadingStores={isLoading}
           nearbyStores={nearbyStores}
           onFindNearbyStores={() => loadNearbyStores(activeTasks)}
+          onShowMoreNearbyStores={() => loadNearbyStores(activeTasks, { searchFurther: true })}
           suggestedTasks={suggestedTasks}
           selectedStore={selectedStore}
           selectedStoreId={selectedStoreId}

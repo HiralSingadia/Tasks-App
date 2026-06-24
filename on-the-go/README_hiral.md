@@ -25,6 +25,7 @@ Nearby store search results, because they depend on current location and can go 
 7. [DONE] Make task items editable
 8. If user adds duplicate items with slightly different text- what to do?
 9. Catgeory limitation - what if someone wants to add a task that is not found on map like clean house, give candle to purva etc?
+10. Smarter locations: nearby stores for each category shown first so max tasks can be done nearby? Maybe stretch
 
 # app/(tabs)/index.tsx
 

@@ -22,6 +22,7 @@ const pinPositions = [
   { left: '62%', top: '18%' },
   { left: '12%', top: '24%' },
 ] as const;
+const snapshotRadiusMiles = 0.5;
 
 const categoryColors: Record<string, string> = {
   'Cafe or convenience store': '#A35D00',
@@ -63,7 +64,9 @@ export function NearbyMapSnapshot({
   );
   const nearestCategoryStores = activePlaces
     .map((place) => {
-      const nearestStore = nearbyStores.find((store) => store.place === place);
+      const nearestStore = nearbyStores.find(
+        (store) => store.place === place && store.distanceMiles <= snapshotRadiusMiles
+      );
 
       if (!nearestStore) {
         return null;
@@ -90,21 +93,16 @@ export function NearbyMapSnapshot({
     0
   );
   const closestStore = nearestCategoryStores[0];
-  const farthestStore = nearestCategoryStores.reduce<NearbyStore | null>(
-    (farthest, store) =>
-      !farthest || store.distanceMiles > farthest.distanceMiles ? store : farthest,
-    null
-  );
   const title = closestStore
     ? `${nearestCategoryStores.length} nearest ${
         nearestCategoryStores.length === 1 ? 'stop' : 'stops'
       }`
     : 'Find nearby matches';
   const subtitle = closestStore
-    ? `${totalTaskCount} ${totalTaskCount === 1 ? 'item' : 'items'} within ${farthestStore?.distanceMiles.toFixed(
+    ? `${totalTaskCount} ${totalTaskCount === 1 ? 'item' : 'items'} within ${snapshotRadiusMiles.toFixed(
         1
       )} mi`
-    : 'See stores that match your open tasks';
+    : `No matching stores within ${snapshotRadiusMiles.toFixed(1)} mi`;
 
   return (
     <Pressable
