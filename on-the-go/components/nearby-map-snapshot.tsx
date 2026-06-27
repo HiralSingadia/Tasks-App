@@ -260,14 +260,15 @@ export function NearbyMapSnapshot({
                 </ThemedView>
                 <ThemedView style={styles.storeLegendTextGroup}>
                   <ThemedText numberOfLines={1} style={styles.storeLegendMeta}>
-                    {store.name} · {store.distanceMiles.toFixed(1)} mi
+                    {store.name}
                   </ThemedText>
                   <ThemedText
                     style={[
                       styles.storeLegendCount,
                       { color: categoryColors[store.place] ?? '#536579' },
                     ]}>
-                    {store.taskCount} {store.taskCount === 1 ? 'item' : 'items'}
+                    {store.taskCount} {store.taskCount === 1 ? 'item' : 'items'} |{' '}
+                    {store.distanceMiles.toFixed(1)} mi
                   </ThemedText>
                 </ThemedView>
               </Pressable>
