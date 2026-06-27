@@ -1,12 +1,9 @@
-import { useMemo } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { NearbyOpportunityCard } from '@/components/nearby-opportunity-card';
-import { taskMatchesPlace } from '@/constants/task-matching';
 import { useNearbyAlerts } from '@/hooks/use-nearby-alerts';
 import { useNearbyStores } from '@/hooks/use-nearby-stores';
-import { useOpportunityNotifications } from '@/hooks/use-opportunity-notifications';
 import { useTasks } from '@/hooks/use-tasks';
 
 export default function NearbyScreen() {
@@ -26,27 +23,6 @@ export default function NearbyScreen() {
     isUpdatingAlerts,
     toggleBackgroundAlerts,
   } = useNearbyAlerts();
-  const { sendOpportunityNotification } = useOpportunityNotifications();
-
-  const suggestedTasks = useMemo(
-    () =>
-      selectedStore
-        ? activeTasks.filter((task) => taskMatchesPlace(task, selectedStore.place))
-        : [],
-    [activeTasks, selectedStore]
-  );
-
-  const notifyOpportunity = () => {
-    if (!selectedStore) {
-      return;
-    }
-
-    sendOpportunityNotification({
-      distanceMinutes: selectedStore.driveMinutes,
-      storeName: selectedStore.name,
-      suggestedTasks,
-    });
-  };
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
@@ -59,11 +35,9 @@ export default function NearbyScreen() {
           isUpdatingAlerts={isUpdatingAlerts}
           nearbyStores={nearbyStores}
           onFindNearbyStores={() => loadNearbyStores(activeTasks)}
-          suggestedTasks={suggestedTasks}
           selectedStore={selectedStore}
           selectedStoreId={selectedStoreId}
           status={status}
-          onNotify={notifyOpportunity}
           onSelectStore={setSelectedStoreId}
           onToggleBackgroundAlerts={toggleBackgroundAlerts}
         />

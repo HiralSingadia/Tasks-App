@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Pressable, StyleSheet } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -15,11 +16,9 @@ type NearbyOpportunityCardProps = {
   isUpdatingAlerts: boolean;
   nearbyStores: NearbyStore[];
   onFindNearbyStores: () => void;
-  suggestedTasks: Task[];
   selectedStore: NearbyStore | null;
   selectedStoreId: string | null;
   status: string;
-  onNotify: () => void;
   onSelectStore: (storeId: string) => void;
   onToggleBackgroundAlerts: () => void;
 };
@@ -112,14 +111,13 @@ export function NearbyOpportunityCard({
   isUpdatingAlerts,
   nearbyStores,
   onFindNearbyStores,
-  suggestedTasks,
   selectedStore,
   selectedStoreId,
   status,
-  onNotify,
   onSelectStore,
   onToggleBackgroundAlerts,
 }: NearbyOpportunityCardProps) {
+  const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
   const hasStores = nearbyStores.length > 0;
   const groupedStores = nearbyStores.reduce<Record<string, NearbyStore[]>>((groups, store) => {
     const hasMatchingTasks = activeTasks.some((task) => taskMatchesPlace(task, store.place));
@@ -135,6 +133,20 @@ export function NearbyOpportunityCard({
       [store.place]: [...currentGroup, store],
     };
   }, {});
+  const groupedStoreEntries = Object.entries(groupedStores);
+  const isEveryCategoryCollapsed =
+    groupedStoreEntries.length > 0 && groupedStoreEntries.every(([place]) => collapsedCategories[place]);
+  const toggleAllCategories = () => {
+    setCollapsedCategories(
+      groupedStoreEntries.reduce<Record<string, boolean>>(
+        (nextCollapsedCategories, [place]) => ({
+          ...nextCollapsedCategories,
+          [place]: !isEveryCategoryCollapsed,
+        }),
+        {}
+      )
+    );
+  };
 
   return (
     <ThemedView style={[styles.alertCard, !hasStores && styles.emptyCard]}>
@@ -148,6 +160,19 @@ export function NearbyOpportunityCard({
         <ThemedText type="subtitle" style={styles.alertTitle}>
           Nearby matches
         </ThemedText>
+        {hasStores ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={toggleAllCategories}
+            style={({ pressed }) => [
+              styles.toggleAllButton,
+              pressed && styles.toggleAllButtonPressed,
+            ]}>
+            <ThemedText style={styles.toggleAllText}>
+              {isEveryCategoryCollapsed ? 'Expand all' : 'Collapse all'}
+            </ThemedText>
+          </Pressable>
+        ) : null}
       </ThemedView>
       {!selectedStore ? (
         <ThemedText style={styles.emptyText}>
@@ -159,17 +184,40 @@ export function NearbyOpportunityCard({
 
       {hasStores ? (
         <ThemedView style={styles.storeGroups}>
-          {Object.entries(groupedStores).map(([place, stores]) => {
+          {groupedStoreEntries.map(([place, stores]) => {
             const matchingTaskCount = activeTasks.filter((task) =>
               taskMatchesPlace(task, place)
             ).length;
             const accent = getCategoryAccent(place);
+            const isCollapsed = collapsedCategories[place] ?? false;
 
             return (
               <ThemedView
                 key={place}
                 style={[styles.storeGroup, { borderColor: accent.border }]}>
-                <ThemedView style={styles.groupHeader}>
+                <Pressable
+                  accessibilityLabel={`${getCategoryLabel(place)}, ${matchingTaskCount} ${
+                    matchingTaskCount === 1 ? 'task' : 'tasks'
+                  }`}
+                  accessibilityHint={isCollapsed ? 'Shows stores in this category' : 'Hides stores in this category'}
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: !isCollapsed }}
+                  onPress={() =>
+                    setCollapsedCategories((currentCategories) => ({
+                      ...currentCategories,
+                      [place]: !isCollapsed,
+                    }))
+                  }
+                  style={({ pressed }) => [
+                    styles.groupHeader,
+                    pressed && styles.groupHeaderPressed,
+                  ]}>
+                  <IconSymbol
+                    name={isCollapsed ? 'chevron.right' : 'chevron.down'}
+                    size={18}
+                    color="#60706A"
+                    style={styles.collapseIcon}
+                  />
                   <ThemedView
                     style={[
                       styles.groupIconBadge,
@@ -187,9 +235,9 @@ export function NearbyOpportunityCard({
                       {matchingTaskCount} {matchingTaskCount === 1 ? 'task' : 'tasks'}
                     </ThemedText>
                   </ThemedView>
-                </ThemedView>
+                </Pressable>
 
-                {stores.map((store) => {
+                {!isCollapsed ? stores.map((store) => {
                   const isSelected = selectedStoreId === store.id;
 
                   return (
@@ -225,7 +273,7 @@ export function NearbyOpportunityCard({
                       </ThemedView>
                     </Pressable>
                   );
-                })}
+                }) : null}
               </ThemedView>
             );
           })}
@@ -241,11 +289,6 @@ export function NearbyOpportunityCard({
             {isLoadingStores ? 'Finding...' : 'Find nearby stores'}
           </ThemedText>
         </Pressable>
-        {selectedStore ? (
-          <Pressable style={styles.secondaryButton} onPress={onNotify}>
-            <ThemedText style={styles.secondaryButtonText}>Notify</ThemedText>
-          </Pressable>
-        ) : null}
         <Pressable
           style={[
             styles.secondaryButton,
@@ -302,6 +345,22 @@ const styles = StyleSheet.create({
     gap: 10,
     marginBottom: 6,
   },
+  toggleAllButton: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#CFE0CF',
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  toggleAllButtonPressed: {
+    opacity: 0.72,
+  },
+  toggleAllText: {
+    color: '#2F6B4F',
+    fontSize: 12,
+    fontWeight: '900',
+  },
   arrowBadge: {
     alignItems: 'center',
     backgroundColor: '#E7F1E7',
@@ -348,6 +407,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     flexDirection: 'row',
     gap: 10,
+  },
+  groupHeaderPressed: {
+    opacity: 0.74,
+  },
+  collapseIcon: {
+    width: 18,
   },
   groupIconBadge: {
     alignItems: 'center',
