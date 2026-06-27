@@ -18,7 +18,7 @@ type TasksContextValue = {
 };
 
 const TasksContext = createContext<TasksContextValue | null>(null);
-const tasksStorageKey = 'on-the-go.tasks.v1';
+export const tasksStorageKey = 'on-the-go.tasks.v1';
 
 function getInitialTasks() {
   return initialTasks.map(normalizeTaskPlaces);

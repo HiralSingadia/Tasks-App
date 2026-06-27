@@ -4,6 +4,7 @@ import React from 'react';
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
+import { NearbyAlertsProvider } from '@/hooks/use-nearby-alerts';
 import { NearbyStoresProvider } from '@/hooks/use-nearby-stores';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { TasksProvider } from '@/hooks/use-tasks';
@@ -13,40 +14,44 @@ export default function TabLayout() {
 
   return (
     <TasksProvider>
-      <NearbyStoresProvider>
-        <Tabs
-          screenOptions={{
-            tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-            headerShown: false,
-            tabBarButton: HapticTab,
-          }}>
-          <Tabs.Screen
-            name="index"
-            options={{
-              title: 'Home',
-              tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
-            }}
-          />
-          <Tabs.Screen
-            name="nearby"
-            options={{
-              title: 'Nearby',
-              tabBarIcon: ({ color }) => (
-                <IconSymbol size={28} name="location.fill" color={color} />
-              ),
-            }}
-          />
-          <Tabs.Screen
-            name="explore"
-            options={{
-              title: 'Explore',
-              tabBarIcon: ({ color }) => (
-                <IconSymbol size={28} name="paperplane.fill" color={color} />
-              ),
-            }}
-          />
-        </Tabs>
-      </NearbyStoresProvider>
+      <NearbyAlertsProvider>
+        <NearbyStoresProvider>
+          <Tabs
+            screenOptions={{
+              tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+              headerShown: false,
+              tabBarButton: HapticTab,
+            }}>
+            <Tabs.Screen
+              name="index"
+              options={{
+                title: 'Home',
+                tabBarIcon: ({ color }) => (
+                  <IconSymbol size={28} name="house.fill" color={color} />
+                ),
+              }}
+            />
+            <Tabs.Screen
+              name="nearby"
+              options={{
+                title: 'Nearby',
+                tabBarIcon: ({ color }) => (
+                  <IconSymbol size={28} name="location.fill" color={color} />
+                ),
+              }}
+            />
+            <Tabs.Screen
+              name="explore"
+              options={{
+                title: 'Explore',
+                tabBarIcon: ({ color }) => (
+                  <IconSymbol size={28} name="paperplane.fill" color={color} />
+                ),
+              }}
+            />
+          </Tabs>
+        </NearbyStoresProvider>
+      </NearbyAlertsProvider>
     </TasksProvider>
   );
 }

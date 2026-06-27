@@ -1,4 +1,6 @@
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet } from 'react-native';
+import MapView, { Marker, PROVIDER_GOOGLE, type Region } from 'react-native-maps';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -14,15 +16,14 @@ type NearbyMapSnapshotProps = {
   onOpenNearby: () => void;
 };
 
-const pinPositions = [
-  { left: '18%', top: '56%' },
-  { left: '48%', top: '28%' },
-  { left: '72%', top: '62%' },
-  { left: '32%', top: '76%' },
-  { left: '62%', top: '18%' },
-  { left: '12%', top: '24%' },
-] as const;
 const snapshotRadiusMiles = 0.5;
+const fallbackMapRegion = {
+  latitude: 37.78825,
+  latitudeDelta: 0.003,
+  longitude: -122.4324,
+  longitudeDelta: 0.003,
+};
+const focusedMapDelta = 0.0012;
 
 const categoryColors: Record<string, string> = {
   'Cafe or convenience store': '#A35D00',
@@ -53,41 +54,80 @@ function getTaskCountForStore(store: NearbyStore, activeTasks: Task[]) {
   return activeTasks.filter((task) => taskMatchesPlace(task, store.place)).length;
 }
 
+function getFocusedMapRegion(store?: { latitude?: number; longitude?: number }): Region {
+  if (
+    store?.latitude === undefined ||
+    store.longitude === undefined ||
+    !Number.isFinite(store.latitude) ||
+    !Number.isFinite(store.longitude)
+  ) {
+    return fallbackMapRegion;
+  }
+
+  return {
+    latitude: store.latitude,
+    latitudeDelta: focusedMapDelta,
+    longitude: store.longitude,
+    longitudeDelta: focusedMapDelta,
+  };
+}
+
+function getMapRegionFromSignature(mappedStoreSignature: string): Region {
+  if (mappedStoreSignature === 'empty-map') {
+    return fallbackMapRegion;
+  }
+
+  const firstStoreSignature = mappedStoreSignature.split('|')[0];
+  const [, latitude, longitude] = firstStoreSignature.split(':');
+
+  return getFocusedMapRegion({
+    latitude: Number(latitude),
+    longitude: Number(longitude),
+  });
+}
+
 export function NearbyMapSnapshot({
   activeTasks,
   isLoading,
   nearbyStores,
   onOpenNearby,
 }: NearbyMapSnapshotProps) {
-  const activePlaces = Array.from(
-    new Set(activeTasks.flatMap((task) => task.places ?? [task.place]))
+  const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
+  const [mapRegion, setMapRegion] = useState<Region>(fallbackMapRegion);
+  const activePlaces = useMemo(
+    () => Array.from(new Set(activeTasks.flatMap((task) => task.places ?? [task.place]))),
+    [activeTasks]
   );
-  const nearestCategoryStores = activePlaces
-    .map((place) => {
-      const nearestStore = nearbyStores.find(
-        (store) => store.place === place && store.distanceMiles <= snapshotRadiusMiles
-      );
+  const nearestCategoryStores = useMemo(
+    () =>
+      activePlaces
+        .map((place) => {
+          const nearestStore = nearbyStores.find(
+            (store) => store.place === place && store.distanceMiles <= snapshotRadiusMiles
+          );
 
-      if (!nearestStore) {
-        return null;
-      }
+          if (!nearestStore) {
+            return null;
+          }
 
-      return {
-        ...nearestStore,
-        taskCount: getTaskCountForStore(nearestStore, activeTasks),
-      };
-    })
-    .filter((store): store is NearbyStore & { taskCount: number } => Boolean(store?.taskCount))
-    .sort((firstStore, secondStore) => {
-      const taskCountDifference = secondStore.taskCount - firstStore.taskCount;
+          return {
+            ...nearestStore,
+            taskCount: getTaskCountForStore(nearestStore, activeTasks),
+          };
+        })
+        .filter((store): store is NearbyStore & { taskCount: number } => Boolean(store?.taskCount))
+        .sort((firstStore, secondStore) => {
+          const taskCountDifference = secondStore.taskCount - firstStore.taskCount;
 
-      if (taskCountDifference !== 0) {
-        return taskCountDifference;
-      }
+          if (taskCountDifference !== 0) {
+            return taskCountDifference;
+          }
 
-      return firstStore.distanceMiles - secondStore.distanceMiles;
-    })
-    .slice(0, pinPositions.length);
+          return firstStore.distanceMiles - secondStore.distanceMiles;
+        })
+        .slice(0, 6),
+    [activePlaces, activeTasks, nearbyStores]
+  );
   const uniqueTaskCount = activeTasks.length;
   const closestStore = nearestCategoryStores[0];
   const title = closestStore
@@ -100,14 +140,48 @@ export function NearbyMapSnapshot({
         1
       )} mi`
     : `No matching stores within ${snapshotRadiusMiles.toFixed(1)} mi`;
+  const selectedLegendStoreId = selectedStoreId ?? closestStore?.id;
+  const mappedNearestStores = nearestCategoryStores.filter(
+    (store): store is NearbyStore & { latitude: number; longitude: number; taskCount: number } =>
+      store.latitude !== undefined && store.longitude !== undefined
+  );
+  const mappedStoreSignature =
+    mappedNearestStores
+      .map((store) => `${store.id}:${store.latitude}:${store.longitude}`)
+      .join('|') || 'empty-map';
+  const defaultMapRegion = useMemo(
+    () => getMapRegionFromSignature(mappedStoreSignature),
+    [mappedStoreSignature]
+  );
+  const focusStoreOnMap = (store: NearbyStore) => {
+    if (store.latitude === undefined || store.longitude === undefined) {
+      return;
+    }
+
+    setSelectedStoreId(store.id);
+    const nextLatitudeDelta = Math.min(mapRegion.latitudeDelta, focusedMapDelta);
+    const nextLongitudeDelta = Math.min(mapRegion.longitudeDelta, focusedMapDelta);
+
+    setMapRegion({
+      latitude: store.latitude,
+      latitudeDelta: nextLatitudeDelta,
+      longitude: store.longitude,
+      longitudeDelta: nextLongitudeDelta,
+    });
+  };
+
+  useEffect(() => {
+    setSelectedStoreId(null);
+    setMapRegion(defaultMapRegion);
+  }, [defaultMapRegion]);
 
   return (
-    <Pressable
-      accessibilityHint="Opens nearby stores"
-      accessibilityRole="button"
-      onPress={onOpenNearby}
-      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}>
-      <ThemedView style={styles.header}>
+    <ThemedView style={styles.card}>
+      <Pressable
+        accessibilityHint="Opens nearby stores"
+        accessibilityRole="button"
+        onPress={onOpenNearby}
+        style={({ pressed }) => [styles.header, pressed && styles.cardPressed]}>
         <ThemedView style={styles.titleGroup}>
           <ThemedText style={styles.title}>{isLoading ? 'Checking nearby...' : title}</ThemedText>
           <ThemedText numberOfLines={1} style={styles.subtitle}>
@@ -117,73 +191,91 @@ export function NearbyMapSnapshot({
         <ThemedView style={styles.locationBadge}>
           <IconSymbol name="location.fill" size={18} color="#2F6B4F" />
         </ThemedView>
-      </ThemedView>
+      </Pressable>
 
       <ThemedView style={styles.map}>
-        <ThemedView style={[styles.road, styles.roadOne]} />
-        <ThemedView style={[styles.road, styles.roadTwo]} />
-        <ThemedView style={[styles.road, styles.roadThree]} />
-        <ThemedView style={styles.currentLocation} />
+        <MapView
+          onRegionChangeComplete={setMapRegion}
+          provider={PROVIDER_GOOGLE}
+          region={mapRegion}
+          scrollEnabled
+          style={styles.nativeMap}
+          zoomEnabled>
+          {mappedNearestStores.map((store, index) => {
+            const isSelectedMarker = selectedLegendStoreId === store.id;
+            const markerColor = categoryColors[store.place] ?? '#536579';
 
-        {nearestCategoryStores.length > 0
-          ? nearestCategoryStores.map((store, index) => (
-              <ThemedView
-                key={store.id}
-                style={[
-                  styles.pin,
-                  pinPositions[index],
-                  { backgroundColor: categoryColors[store.place] ?? '#536579' },
-                ]}>
-                <ThemedText style={styles.pinText}>{store.taskCount}</ThemedText>
-              </ThemedView>
-            ))
-          : (
-              <ThemedView style={styles.emptyPin}>
-                <IconSymbol name="location.fill" size={18} color="#60706A" />
-              </ThemedView>
-            )}
+            return (
+              <Marker
+                coordinate={{ latitude: store.latitude, longitude: store.longitude }}
+                description={`${store.taskCount} ${
+                  store.taskCount === 1 ? 'item' : 'items'
+                } nearby`}
+                key={`${store.place}-${store.id}-${index}`}
+                pinColor={markerColor}
+                title={store.name}
+                zIndex={isSelectedMarker ? 2 : 1}
+              />
+            );
+          })}
+        </MapView>
+        {nearestCategoryStores.length === 0 ? (
+          <ThemedView style={styles.emptyMapOverlay}>
+            <IconSymbol name="location.fill" size={18} color="#60706A" />
+          </ThemedView>
+        ) : null}
       </ThemedView>
 
       {nearestCategoryStores.length > 0 ? (
         <ThemedView style={styles.storeLegend}>
-          {nearestCategoryStores.map((store) => (
-            <ThemedView
-              key={store.id}
-              style={[
-                styles.storeLegendBubble,
-                {
-                  backgroundColor: categorySoftColors[store.place] ?? '#F0F4F8',
-                  borderColor: categoryColors[store.place] ?? '#536579',
-                },
-              ]}>
-              <ThemedView
-                style={[
-                  styles.storeLegendIcon,
-                  { backgroundColor: categoryColors[store.place] ?? '#536579' },
+          {nearestCategoryStores.map((store) => {
+            const isSelectedStore = selectedLegendStoreId === store.id;
+
+            return (
+              <Pressable
+                accessibilityHint="Centers the map on this store"
+                accessibilityLabel={`${store.name}, ${store.distanceMiles.toFixed(1)} miles away`}
+                accessibilityRole="button"
+                onPress={() => focusStoreOnMap(store)}
+                key={store.id}
+                style={({ pressed }) => [
+                  styles.storeLegendBubble,
+                  {
+                    backgroundColor: categorySoftColors[store.place] ?? '#F0F4F8',
+                    borderColor: categoryColors[store.place] ?? '#536579',
+                  },
+                  isSelectedStore && styles.selectedStoreLegendBubble,
+                  pressed && styles.storeLegendBubblePressed,
                 ]}>
-                <IconSymbol
-                  name={categorySymbols[store.place] ?? 'mappin.circle.fill'}
-                  size={18}
-                  color="#FFFFFF"
-                />
-              </ThemedView>
-              <ThemedView style={styles.storeLegendTextGroup}>
-                <ThemedText numberOfLines={1} style={styles.storeLegendMeta}>
-                  {store.name} · {store.distanceMiles.toFixed(1)} mi
-                </ThemedText>
-                <ThemedText
+                <ThemedView
                   style={[
-                    styles.storeLegendCount,
-                    { color: categoryColors[store.place] ?? '#536579' },
+                    styles.storeLegendIcon,
+                    { backgroundColor: categoryColors[store.place] ?? '#536579' },
                   ]}>
-                  {store.taskCount} {store.taskCount === 1 ? 'item' : 'items'}
-                </ThemedText>
-              </ThemedView>
-            </ThemedView>
-          ))}
+                  <IconSymbol
+                    name={categorySymbols[store.place] ?? 'mappin.circle.fill'}
+                    size={18}
+                    color="#FFFFFF"
+                  />
+                </ThemedView>
+                <ThemedView style={styles.storeLegendTextGroup}>
+                  <ThemedText numberOfLines={1} style={styles.storeLegendMeta}>
+                    {store.name} · {store.distanceMiles.toFixed(1)} mi
+                  </ThemedText>
+                  <ThemedText
+                    style={[
+                      styles.storeLegendCount,
+                      { color: categoryColors[store.place] ?? '#536579' },
+                    ]}>
+                    {store.taskCount} {store.taskCount === 1 ? 'item' : 'items'}
+                  </ThemedText>
+                </ThemedView>
+              </Pressable>
+            );
+          })}
         </ThemedView>
       ) : null}
-    </Pressable>
+    </ThemedView>
   );
 }
 
@@ -241,61 +333,14 @@ const styles = StyleSheet.create({
     borderColor: '#D8E6D2',
     borderRadius: 14,
     borderWidth: 1,
-    height: 118,
+    height: 180,
     overflow: 'hidden',
   },
-  road: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#D8E6D2',
-    borderWidth: 1,
-    height: 18,
-    opacity: 0.9,
-    position: 'absolute',
-    width: 190,
+  nativeMap: {
+    height: '100%',
+    width: '100%',
   },
-  roadOne: {
-    left: -20,
-    top: 28,
-    transform: [{ rotate: '-18deg' }],
-  },
-  roadTwo: {
-    right: -30,
-    top: 70,
-    transform: [{ rotate: '21deg' }],
-  },
-  roadThree: {
-    left: 70,
-    top: 48,
-    transform: [{ rotate: '88deg' }],
-  },
-  currentLocation: {
-    backgroundColor: '#17231C',
-    borderColor: '#FFFFFF',
-    borderRadius: 8,
-    borderWidth: 3,
-    height: 16,
-    left: '48%',
-    position: 'absolute',
-    top: '50%',
-    width: 16,
-  },
-  pin: {
-    alignItems: 'center',
-    borderColor: '#FFFFFF',
-    borderRadius: 16,
-    borderWidth: 3,
-    height: 32,
-    justifyContent: 'center',
-    position: 'absolute',
-    width: 32,
-  },
-  pinText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '900',
-    lineHeight: 18,
-  },
-  emptyPin: {
+  emptyMapOverlay: {
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
     borderColor: '#D7DEE7',
@@ -326,6 +371,12 @@ const styles = StyleSheet.create({
     minWidth: 0,
     paddingHorizontal: 7,
     paddingVertical: 9,
+  },
+  selectedStoreLegendBubble: {
+    borderWidth: 2,
+  },
+  storeLegendBubblePressed: {
+    opacity: 0.78,
   },
   storeLegendIcon: {
     alignItems: 'center',

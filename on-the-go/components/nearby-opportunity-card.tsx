@@ -9,7 +9,10 @@ import type { Task } from '@/types/task';
 
 type NearbyOpportunityCardProps = {
   activeTasks: Task[];
+  alertStatus: string;
+  backgroundAlertsEnabled: boolean;
   isLoadingStores: boolean;
+  isUpdatingAlerts: boolean;
   nearbyStores: NearbyStore[];
   onFindNearbyStores: () => void;
   suggestedTasks: Task[];
@@ -18,6 +21,7 @@ type NearbyOpportunityCardProps = {
   status: string;
   onNotify: () => void;
   onSelectStore: (storeId: string) => void;
+  onToggleBackgroundAlerts: () => void;
 };
 
 const CATEGORY_SYMBOLS: Record<string, IconSymbolName> = {
@@ -102,7 +106,10 @@ function getCategoryLabel(place: string) {
 
 export function NearbyOpportunityCard({
   activeTasks,
+  alertStatus,
+  backgroundAlertsEnabled,
   isLoadingStores,
+  isUpdatingAlerts,
   nearbyStores,
   onFindNearbyStores,
   suggestedTasks,
@@ -111,6 +118,7 @@ export function NearbyOpportunityCard({
   status,
   onNotify,
   onSelectStore,
+  onToggleBackgroundAlerts,
 }: NearbyOpportunityCardProps) {
   const hasStores = nearbyStores.length > 0;
   const groupedStores = nearbyStores.reduce<Record<string, NearbyStore[]>>((groups, store) => {
@@ -147,6 +155,7 @@ export function NearbyOpportunityCard({
         </ThemedText>
       ) : null}
       {status ? <ThemedText style={styles.statusText}>{status}</ThemedText> : null}
+      {alertStatus ? <ThemedText style={styles.alertStatusText}>{alertStatus}</ThemedText> : null}
 
       {hasStores ? (
         <ThemedView style={styles.storeGroups}>
@@ -237,6 +246,26 @@ export function NearbyOpportunityCard({
             <ThemedText style={styles.secondaryButtonText}>Notify</ThemedText>
           </Pressable>
         ) : null}
+        <Pressable
+          style={[
+            styles.secondaryButton,
+            backgroundAlertsEnabled && styles.alertsOnButton,
+            isUpdatingAlerts && styles.disabledButton,
+          ]}
+          onPress={onToggleBackgroundAlerts}
+          disabled={isUpdatingAlerts}>
+          <ThemedText
+            style={[
+              styles.secondaryButtonText,
+              backgroundAlertsEnabled && styles.alertsOnButtonText,
+            ]}>
+            {isUpdatingAlerts
+              ? 'Updating...'
+              : backgroundAlertsEnabled
+                ? 'Alerts on'
+                : 'Enable alerts'}
+          </ThemedText>
+        </Pressable>
       </ThemedView>
     </ThemedView>
   );
@@ -294,6 +323,13 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     lineHeight: 22,
     marginTop: 6,
+  },
+  alertStatusText: {
+    color: '#60706A',
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 18,
+    marginTop: 4,
   },
   storeGroups: {
     backgroundColor: 'transparent',
@@ -375,6 +411,7 @@ const styles = StyleSheet.create({
   },
   actionRow: {
     backgroundColor: 'transparent',
+    flexWrap: 'wrap',
     flexDirection: 'row',
     gap: 10,
     marginTop: 12,
@@ -405,5 +442,12 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     color: '#1F4D2B',
     fontWeight: '700',
+  },
+  alertsOnButton: {
+    backgroundColor: '#1F4D2B',
+    borderColor: '#1F4D2B',
+  },
+  alertsOnButtonText: {
+    color: '#FFFFFF',
   },
 });
