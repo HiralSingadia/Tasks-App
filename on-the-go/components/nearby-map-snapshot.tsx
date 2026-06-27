@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE, type Region } from 'react-native-maps';
 
@@ -92,8 +92,9 @@ export function NearbyMapSnapshot({
   nearbyStores,
   onOpenNearby,
 }: NearbyMapSnapshotProps) {
+  const mapRef = useRef<MapView>(null);
+  const currentMapRegion = useRef<Region>(fallbackMapRegion);
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
-  const [mapRegion, setMapRegion] = useState<Region>(fallbackMapRegion);
   const activePlaces = useMemo(
     () => Array.from(new Set(activeTasks.flatMap((task) => task.places ?? [task.place]))),
     [activeTasks]
@@ -159,20 +160,22 @@ export function NearbyMapSnapshot({
     }
 
     setSelectedStoreId(store.id);
-    const nextLatitudeDelta = Math.min(mapRegion.latitudeDelta, focusedMapDelta);
-    const nextLongitudeDelta = Math.min(mapRegion.longitudeDelta, focusedMapDelta);
-
-    setMapRegion({
+    const nextLatitudeDelta = Math.min(currentMapRegion.current.latitudeDelta, focusedMapDelta);
+    const nextLongitudeDelta = Math.min(currentMapRegion.current.longitudeDelta, focusedMapDelta);
+    const nextRegion = {
       latitude: store.latitude,
       latitudeDelta: nextLatitudeDelta,
       longitude: store.longitude,
       longitudeDelta: nextLongitudeDelta,
-    });
+    };
+
+    currentMapRegion.current = nextRegion;
+    mapRef.current?.animateToRegion(nextRegion, 250);
   };
 
   useEffect(() => {
     setSelectedStoreId(null);
-    setMapRegion(defaultMapRegion);
+    currentMapRegion.current = defaultMapRegion;
   }, [defaultMapRegion]);
 
   return (
@@ -195,9 +198,13 @@ export function NearbyMapSnapshot({
 
       <ThemedView style={styles.map}>
         <MapView
-          onRegionChangeComplete={setMapRegion}
+          key={mappedStoreSignature}
+          ref={mapRef}
+          initialRegion={defaultMapRegion}
+          onRegionChangeComplete={(region) => {
+            currentMapRegion.current = region;
+          }}
           provider={PROVIDER_GOOGLE}
-          region={mapRegion}
           scrollEnabled
           style={styles.nativeMap}
           zoomEnabled>
@@ -212,6 +219,7 @@ export function NearbyMapSnapshot({
                   store.taskCount === 1 ? 'item' : 'items'
                 } nearby`}
                 key={`${store.place}-${store.id}-${index}`}
+                onPress={() => setSelectedStoreId(store.id)}
                 pinColor={markerColor}
                 title={store.name}
                 zIndex={isSelectedMarker ? 2 : 1}
